@@ -200,6 +200,9 @@ struct Review: AsyncParsableCommand {
             if !finding.location.isEmpty {
                 print("  Location: \(finding.location)")
             }
+            if let raisedBy = finding.raisedBy, !raisedBy.isEmpty {
+                print("  Raised by: \(raisedBy.joined(separator: ", "))")
+            }
             print("")
         }
 

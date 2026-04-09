@@ -24,17 +24,21 @@ public enum ConsensusBuilder {
     ) -> ConsensusSummary {
         let providerCount = providers.count
 
-        // Use only the final round's findings — that's where positions converged
-        let finalFindings: [Finding]
+        // Use only the final round's findings — that's where positions converged.
+        // Track which provider raised each finding for attribution.
+        var attributedFindings: [(Finding, String)] = []
         if let lastRound = transcript.rounds.last {
-            finalFindings = lastRound.responses.flatMap { $0.findings }
-        } else {
-            finalFindings = []
+            for response in lastRound.responses {
+                let providerLabel = "\(response.providerName) (\(response.model))"
+                for finding in response.findings {
+                    attributedFindings.append((finding, providerLabel))
+                }
+            }
         }
 
         let respondedCount = transcript.rounds.last?.responses.count ?? providerCount
-        let grouped = groupBySimilarity(finalFindings)
-        let mergedFindings = mergeGroups(grouped, respondedCount: respondedCount)
+        let grouped = groupBySimilarityWithAttribution(attributedFindings)
+        let mergedFindings = mergeGroupsWithAttribution(grouped, respondedCount: respondedCount)
         let sorted = sortFindings(mergedFindings)
 
         let recommendation = buildRecommendation(from: sorted)
@@ -114,8 +118,36 @@ public enum ConsensusBuilder {
 
         let modelsConsulted = providers.map { "\($0.name) (\($0.model))" }
 
+        // Attribute each of Claude's synthesized findings back to the providers
+        // who raised similar findings in the final round.
+        var attributedFindings: [(Finding, String)] = []
+        if let lastRound = transcript.rounds.last {
+            for response in lastRound.responses {
+                let providerLabel = "\(response.providerName) (\(response.model))"
+                for finding in response.findings {
+                    attributedFindings.append((finding, providerLabel))
+                }
+            }
+        }
+
+        let findingsWithAttribution = review.findings.map { finding -> Finding in
+            let normalized = normalizeTitle(finding.title)
+            var seen: Set<String> = []
+            var raisedBy: [String] = []
+            for (rawFinding, provider) in attributedFindings {
+                if titlesAreSimilar(normalized, normalizeTitle(rawFinding.title)) {
+                    if seen.insert(provider).inserted {
+                        raisedBy.append(provider)
+                    }
+                }
+            }
+            var updated = finding
+            updated.raisedBy = raisedBy.isEmpty ? nil : raisedBy
+            return updated
+        }
+
         return ConsensusSummary(
-            findings: review.findings,
+            findings: findingsWithAttribution,
             recommendation: review.content,
             modelsConsulted: modelsConsulted,
             roundsCompleted: transcript.rounds.count,
@@ -178,6 +210,33 @@ public enum ConsensusBuilder {
 
             if !matched {
                 groups.append([finding])
+            }
+        }
+
+        return groups
+    }
+
+    /// Like groupBySimilarity but tracks which provider raised each finding.
+    private static func groupBySimilarityWithAttribution(
+        _ findings: [(Finding, String)]
+    ) -> [[(Finding, String)]] {
+        var groups: [[(Finding, String)]] = []
+
+        for entry in findings {
+            let normalized = normalizeTitle(entry.0.title)
+            var matched = false
+
+            for i in groups.indices {
+                let groupNormalized = normalizeTitle(groups[i][0].0.title)
+                if titlesAreSimilar(normalized, groupNormalized) {
+                    groups[i].append(entry)
+                    matched = true
+                    break
+                }
+            }
+
+            if !matched {
+                groups.append([entry])
             }
         }
 
@@ -254,6 +313,39 @@ public enum ConsensusBuilder {
                 agreement: agreement,
                 recommendation: recommendation,
                 location: location
+            )
+        }
+    }
+
+    /// Like mergeGroups but populates raisedBy from provider attribution.
+    private static func mergeGroupsWithAttribution(
+        _ groups: [[(Finding, String)]],
+        respondedCount: Int
+    ) -> [Finding] {
+        groups.map { entries in
+            // Unique providers that raised this finding (dedup while preserving order)
+            var seen: Set<String> = []
+            let raisedBy = entries.compactMap { entry -> String? in
+                seen.insert(entry.1).inserted ? entry.1 : nil
+            }
+
+            let agreement = determineAgreement(
+                raisedBy: raisedBy.count,
+                totalProviders: respondedCount
+            )
+
+            let findings = entries.map(\.0)
+            let highestSeverity = findings.map(\.severity).max() ?? .low
+            let bestFinding = findings.max(by: { $0.severity < $1.severity }) ?? findings[0]
+
+            return Finding(
+                title: bestFinding.title,
+                description: bestFinding.description,
+                severity: highestSeverity,
+                agreement: agreement,
+                recommendation: bestFinding.recommendation,
+                location: bestFinding.location,
+                raisedBy: raisedBy
             )
         }
     }
