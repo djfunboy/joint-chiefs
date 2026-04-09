@@ -1,0 +1,20 @@
+# Local API keys and secrets
+tasks/api-keys.local.md
+*.local.md
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# macOS
+.DS_Store
+
+# Xcode
+*.xcuserdata/
+*.xcuserstate
+xcuserdata/
+
+# Build products
+DerivedData/
+build/
