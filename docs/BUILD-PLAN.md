@@ -7,7 +7,7 @@
 
 Joint Chiefs is a working CLI tool. Running `jointchiefs review <file> --goal "..."` in any terminal produces a streaming, multi-model code review with a final consensus summary.
 
-- **CLI installed** at `/usr/local/bin/jointchiefs` — direct execution, no local HTTP server required
+- **CLI installed** at `/opt/homebrew/bin/jointchiefs` (Apple Silicon only) — direct execution, no local HTTP server required
 - **5 providers live:** OpenAI, Google Gemini, xAI Grok, Anthropic Claude, plus optional Ollama
 - **Streaming SSE** from every provider — tokens appear live as each model speaks
 - **Hub-and-spoke debate:** OpenAI / Gemini / Grok are spokes, Claude is the moderator/decider
@@ -21,6 +21,7 @@ Phases 1-5 are complete. Phase 6+ (menu bar app, transcript viewer, MCP wrapper)
 ## Pre-Build Checklist
 
 - [x] Xcode 16+ installed with macOS 15 SDK
+- [x] Apple Silicon Mac (M-series) — Intel Macs not supported
 - [x] API keys available for at least 2 LLM providers
 - [x] Swift ArgumentParser confirmed (Hummingbird deferred with Phase 4)
 - [x] Data model designed (see DATA-MODEL.md)
@@ -115,13 +116,13 @@ Phases 1-5 are complete. Phase 6+ (menu bar app, transcript viewer, MCP wrapper)
 3. ✅ Implement `--stdin` flag for piped input (e.g., `git diff | jointchiefs review --stdin`)
 4. ✅ Implement `--goal` flag for review focus
 5. ✅ Stream SSE tokens to stdout live as each model speaks
-6. ✅ Install to `/usr/local/bin/jointchiefs`
+6. ✅ Install to `/opt/homebrew/bin/jointchiefs`
 
 **Checkpoint:**
 - [x] `jointchiefs review src/example.swift` streams consensus summary to terminal
 - [x] `echo "code" | jointchiefs review --stdin` works
 - [x] Clear error message when API keys are missing
-- [x] Installed at `/usr/local/bin/jointchiefs`
+- [x] Installed at `/opt/homebrew/bin/jointchiefs`
 
 ---
 

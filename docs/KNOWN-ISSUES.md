@@ -1,38 +1,35 @@
 # Joint Chiefs — Known Issues
 
-**Last Updated:** 2026-04-09
+**Last Updated:** 2026-04-16
+
+A running list of known bugs, limitations, and rough edges. PRs that fix any of these are welcome.
 
 ## Active Bugs
 
-- **Anthropic provider returns raw JSON in findings** — The consensus output from Claude shows raw JSON in finding descriptions instead of parsed structured findings. The AnthropicProvider's parseFindings doesn't extract from Claude's response format properly. Workaround: the JSON is still readable.
+_None currently tracked — file an issue if you hit something._
 
-## Technical Debt
+## Known Limitations
 
-- **Streaming Task not cancelled on early termination** — `runReviewStreaming` creates an unstructured `Task` inside `AsyncStream` but doesn't use `continuation.onTermination` to cancel it when the consumer stops iterating.
-- **Duplicate orchestration logic** — `runReview` and `runReviewStreaming` implement substantially the same workflow separately. Bug fixes to one won't reach the other.
-- **No input validation on init** — DebateOrchestrator accepts negative debateRounds without validation.
-- **Empty debate rounds silently continue** — If all providers fail in a debate round, it appends an empty round and keeps going.
-- **No streaming output to user during model responses** — CLI shows progress between providers but waits for each provider to finish before displaying their findings. Could show tokens as they arrive.
+- **Streaming task is not cancelled on early termination.** `runReviewStreaming` creates an unstructured `Task` inside the `AsyncStream` but doesn't wire `continuation.onTermination` to cancel it when the consumer stops iterating. Long debates keep running in the background after a CLI Ctrl-C.
+- **Duplicate orchestration paths.** `runReview` and `runReviewStreaming` implement substantially the same workflow in parallel. Bug fixes need to be applied to both.
+- **No validation on `debateRounds`.** `DebateOrchestrator.init` accepts negative values without complaint.
+- **Empty debate rounds silently continue.** If every provider fails in a single round, the orchestrator records an empty round and keeps going instead of breaking.
+- **Convergence detection is title-similarity based.** The adaptive early-break heuristic compares finding titles across rounds. It may stop debate too early when models phrase the same finding differently, or too late when they word the same surface issue identically but disagree on substance.
 
-## Pending Improvements (from Joint Chiefs reviews)
+## Roadmap-Adjacent
 
-These were raised by the Joint Chiefs themselves during testing and remain unaddressed:
+These were raised by Joint Chiefs reviewing its own source and remain open:
 
-- Provider attribution lost in non-streaming error path
-- Hardcoded logger subsystem reduces reusability
-- ReviewProvider existential used across task-group boundaries without explicit Sendable guarantees
-- Convergence detection heuristic is title-similarity based and may stop debate too early or too late
+- Provider attribution can be lost in the non-streaming error path.
+- Logger subsystem is hardcoded, which limits reuse if `JointChiefsCore` is embedded in another app.
+- `ReviewProvider` existential is passed across `TaskGroup` boundaries without explicit `Sendable` annotation.
 
-## Documentation Gaps
+## QA Areas Needing More Coverage
 
-None — all initial documentation is in place.
+Manual verification gaps (automated tests cover the unit and orchestrator layers, but these need real-world runs):
 
-## QA Areas Requiring Manual Verification
-
-- [ ] Live test with all 4 providers + Claude as moderator (verified working 2026-04-09)
-- [ ] Adaptive break early-stopping behavior in production
-- [ ] Hub-and-spoke moderator synthesis quality
-- [ ] Keychain storage with kSecAttrAccessibleWhenUnlockedThisDeviceOnly across app restarts
-- [ ] CLI behavior with no API keys configured
-- [ ] CLI behavior with only some providers configured
-- [ ] Large file reviews (>1000 lines)
+- [ ] Adaptive early-break behavior with all 5 providers under load.
+- [ ] Hub-and-spoke moderator synthesis quality on large diffs (>1000 lines).
+- [ ] Keychain storage with `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` across reboots.
+- [ ] CLI behavior when no API keys are configured (should print a clear error).
+- [ ] CLI behavior when only one provider is configured (should still produce useful output).

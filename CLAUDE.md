@@ -5,7 +5,7 @@ Multi-model AI code review orchestrator. CLI tool that sends code to multiple LL
 ## Current State
 
 - **Phases 1-5 complete.** Phase 6+ (menu bar app, transcript viewer, MCP wrapper) deferred — CLI-only works fine for solo use.
-- **CLI installed** at `/usr/local/bin/jointchiefs`. Runs directly without a local HTTP server.
+- **CLI installed** at `/opt/homebrew/bin/jointchiefs` (Apple Silicon only). Runs directly without a local HTTP server.
 - **5 providers working:** OpenAI, Google Gemini, xAI Grok, Anthropic Claude, plus optional Ollama for local models.
 - **Streaming SSE** on every provider — tokens appear live in the terminal as each model speaks.
 - **Hub-and-spoke debate:** spokes (OpenAI, Gemini, Grok) produce findings; Claude (hub) moderates rounds and writes the final anonymous synthesis.
@@ -17,7 +17,7 @@ Multi-model AI code review orchestrator. CLI tool that sends code to multiple LL
 - **@Observable macro.** macOS 15+ target. Use `@State`, `@Environment`, `@Bindable`. Never mix with `ObservableObject`.
 - **@MainActor** on all classes that publish UI state.
 - **Service pattern:** `@Environment` injection (no singletons). Same pattern as Degree Daddy.
-- **Build system:** Swift Package Manager. Minimum target macOS 15.0 (Sonoma).
+- **Build system:** Swift Package Manager. Minimum target macOS 15.0 (Sonoma). **Apple Silicon only** — Intel Macs are not supported.
 
 ## Tech Stack
 

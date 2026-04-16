@@ -62,7 +62,7 @@ Claude (hub) synthesizes the debate into a structured final summary; falls back 
 - [x] Concise summary returned to the CLI
 
 ### F4: Universal CLI Trigger — DONE
-CLI tool installed at `/usr/local/bin/jointchiefs`. Runs directly — no local HTTP server required.
+CLI tool installed at `/opt/homebrew/bin/jointchiefs` (Apple Silicon Macs only). Runs directly — no local HTTP server required.
 - [x] CLI tool: `jointchiefs review <path> [--goal "..."] [--context "..."]`
 - [x] Streaming SSE output: tokens appear live in the terminal
 - [x] Exit code 0 on success, 1 on failure
@@ -107,8 +107,11 @@ Local transcript files written to disk. A UI for browsing them is deferred with 
 ## User Flows
 
 ### Flow 1: First-Time Setup
+
+**Requirements:** Apple Silicon Mac (M-series), macOS 15+, Xcode 16+.
+
 1. Build the CLI: `cd ~/Dropbox/Build/Joint\ Chiefs/JointChiefs && swift build -c release`
-2. Install: `cp .build/release/jointchiefs /usr/local/bin/jointchiefs`
+2. Install: `cp .build/release/jointchiefs /opt/homebrew/bin/jointchiefs`
 3. Add API keys to `~/.zshrc`:
    ```
    export OPENAI_API_KEY="sk-..."
