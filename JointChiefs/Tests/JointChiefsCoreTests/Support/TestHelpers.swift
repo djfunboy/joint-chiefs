@@ -72,6 +72,24 @@ enum TestHelpers {
         return Data(body.utf8)
     }
 
+    /// Builds Anthropic-style SSE streaming response data from a content string.
+    ///
+    /// Emits one `content_block_delta` event per character to simulate token-by-token
+    /// streaming through `URLSession.bytes(for:)` line iteration.
+    static func makeAnthropicStreamingResponse(content: String) -> Data {
+        var sseLines: [String] = []
+        for char in content {
+            let event: [String: Any] = [
+                "type": "content_block_delta",
+                "delta": ["type": "text_delta", "text": String(char)]
+            ]
+            let json = try! JSONSerialization.data(withJSONObject: event)
+            sseLines.append("data: \(String(data: json, encoding: .utf8)!)")
+        }
+        let body = sseLines.joined(separator: "\n") + "\n"
+        return Data(body.utf8)
+    }
+
     static func makeHTTPResponse(url: URL, statusCode: Int, headers: [String: String]? = nil) -> HTTPURLResponse {
         HTTPURLResponse(
             url: url,

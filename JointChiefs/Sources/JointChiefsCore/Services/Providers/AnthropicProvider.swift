@@ -189,14 +189,19 @@ public struct AnthropicProvider: ReviewProvider {
         return (content, findings)
     }
 
-    /// Attempts to parse structured findings from a JSON response string.
+    /// Attempts to parse structured findings from a response string.
     ///
-    /// Falls back to a single finding with the raw content if JSON parsing fails.
+    /// Claude has no enforced JSON-output mode (unlike OpenAI's `response_format`), so
+    /// despite the prompt instruction to return only JSON, responses regularly arrive
+    /// wrapped in ```json ... ``` code fences or with surrounding prose. This method
+    /// extracts the first balanced `{...}` span before decoding, falling back to a
+    /// single finding with the raw content if no JSON object is found.
     ///
     /// - Parameter content: The raw response content string.
     /// - Returns: An array of parsed `Finding` objects.
     private func parseFindings(from content: String) -> [Finding] {
-        guard let data = content.data(using: .utf8) else {
+        guard let json = extractJSONObject(from: content),
+              let data = json.data(using: .utf8) else {
             return [makeFallbackFinding(from: content)]
         }
 
@@ -215,6 +220,18 @@ public struct AnthropicProvider: ReviewProvider {
         } catch {
             return [makeFallbackFinding(from: content)]
         }
+    }
+
+    /// Returns the substring spanning the first `{` to the last `}` in `content`,
+    /// or `nil` if none exists. JSONDecoder validates structural correctness — this
+    /// is just a cheap way to strip code fences and conversational preamble.
+    private func extractJSONObject(from content: String) -> String? {
+        guard let firstBrace = content.firstIndex(of: "{"),
+              let lastBrace = content.lastIndex(of: "}"),
+              firstBrace <= lastBrace else {
+            return nil
+        }
+        return String(content[firstBrace...lastBrace])
     }
 
     private func makeFallbackFinding(from content: String) -> Finding {
