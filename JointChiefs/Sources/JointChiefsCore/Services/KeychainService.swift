@@ -10,7 +10,7 @@ import Security
 /// - Swift String values remain in memory until deallocated (platform limitation).
 public enum KeychainService {
 
-    static let service = "com.jointchiefs.provider"
+    static let service = "com.jointchiefs.keygetter"
 
     // MARK: - Public Methods
 

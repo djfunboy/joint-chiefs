@@ -19,11 +19,11 @@ struct Review: AsyncParsableCommand {
     @Option(name: .long, help: "Additional context for reviewers")
     var context: String?
 
-    @Option(name: .long, help: "Number of debate rounds (default: 5)")
-    var rounds: Int = 5
+    @Option(name: .long, help: "Number of debate rounds (overrides strategy)")
+    var rounds: Int?
 
-    @Option(name: .long, help: "Timeout per provider in seconds (default: 120)")
-    var timeout: Int = 120
+    @Option(name: .long, help: "Timeout per provider in seconds (overrides strategy)")
+    var timeout: Int?
 
     @Option(name: .long, help: "Output format: summary, json, or full (default: summary)")
     var format: OutputFormat = .summary
@@ -42,19 +42,25 @@ struct Review: AsyncParsableCommand {
         let providers = buildProviders()
 
         guard !providers.isEmpty else {
-            stderr("No API keys found. Set at least one environment variable:")
-            stderr("  OPENAI_API_KEY, GEMINI_API_KEY, GROK_API_KEY")
-            stderr("  Or OLLAMA_ENABLED=1 for local Ollama models")
+            stderr("No API keys found. Configure at least one provider:")
+            stderr("  • Run the Joint Chiefs app to add a key via the Keychain, or")
+            stderr("  • Export one of: OPENAI_API_KEY, GEMINI_API_KEY, GROK_API_KEY, ANTHROPIC_API_KEY")
+            stderr("  • Or set OLLAMA_ENABLED=1 for local Ollama models")
             throw ExitCode.failure
         }
 
-        let decidingModel = buildConsensusProvider()
+        var strategy = StrategyConfigStore.load()
+        if let rounds { strategy.maxRounds = rounds }
+        if let timeout { strategy.timeoutSeconds = timeout }
+
+        let moderator = ProviderFactory.build(for: strategy.moderator, resolveKey: self.resolveKey)
+        let tiebreaker = ProviderFactory.buildTiebreaker(for: strategy.tiebreaker, resolveKey: self.resolveKey)
 
         let orchestrator = DebateOrchestrator(
             providers: providers,
-            consensusProvider: decidingModel,
-            debateRounds: rounds,
-            timeoutSeconds: timeout
+            moderator: moderator,
+            tiebreaker: tiebreaker,
+            strategy: strategy
         )
 
         let reviewContext = ReviewContext(
@@ -255,46 +261,18 @@ struct Review: AsyncParsableCommand {
     // MARK: - Provider Setup
 
     private func buildProviders() -> [any ReviewProvider] {
-        var providers: [any ReviewProvider] = []
-
-        if let key = ProcessInfo.processInfo.environment["OPENAI_API_KEY"], !key.isEmpty {
-            let model = ProcessInfo.processInfo.environment["OPENAI_MODEL"] ?? "gpt-5.4"
-            providers.append(OpenAIProvider(apiKey: key, model: model))
-        }
-
-        if let key = ProcessInfo.processInfo.environment["GEMINI_API_KEY"], !key.isEmpty {
-            let model = ProcessInfo.processInfo.environment["GEMINI_MODEL"] ?? "gemini-3.1-pro-preview"
-            providers.append(GeminiProvider(apiKey: key, model: model))
-        }
-
-        if let key = ProcessInfo.processInfo.environment["GROK_API_KEY"], !key.isEmpty {
-            let model = ProcessInfo.processInfo.environment["GROK_MODEL"] ?? "grok-3"
-            providers.append(GrokProvider(apiKey: key, model: model))
-        }
-
-        if let key = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"], !key.isEmpty {
-            let model = ProcessInfo.processInfo.environment["ANTHROPIC_MODEL"] ?? "claude-opus-4-6"
-            providers.append(AnthropicProvider(apiKey: key, model: model))
-        }
-
-        if ProcessInfo.processInfo.environment["OLLAMA_ENABLED"] == "1" {
-            let model = ProcessInfo.processInfo.environment["OLLAMA_MODEL"] ?? "llama3"
-            providers.append(OllamaProvider(model: model))
-        }
-
-        return providers
+        ProviderFactory.buildPanel(resolveKey: self.resolveKey)
     }
 
-    /// Builds the deciding model that synthesizes consensus. Defaults to Claude.
-    private func buildConsensusProvider() -> (any ReviewProvider)? {
-        // ANTHROPIC_API_KEY is the default consensus provider (Claude)
-        if let key = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"], !key.isEmpty {
-            let model = ProcessInfo.processInfo.environment["CONSENSUS_MODEL"] ?? "claude-opus-4-6"
-            return AnthropicProvider(apiKey: key, model: model)
+    /// Env var → keygetter → nil. Surfaces keygetter errors to the user; silent
+    /// "not configured" when neither source supplies a key.
+    private func resolveKey(_ provider: ProviderType) -> String? {
+        do {
+            return try APIKeyResolver.resolve(provider)
+        } catch {
+            stderr("Key resolution failed for \(provider.rawValue): \(error.localizedDescription)")
+            return nil
         }
-
-        // Fall back to code-based consensus if no deciding model is configured
-        return nil
     }
 
     // MARK: - Formatting Helpers

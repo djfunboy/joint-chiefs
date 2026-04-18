@@ -1,7 +1,7 @@
 # Joint Chiefs — Architecture
 
-**Version:** 1.1
-**Last Updated:** 2026-04-09
+**Version:** 1.2
+**Last Updated:** 2026-04-18
 
 ## System Overview
 
@@ -73,8 +73,7 @@ fallback if Claude is unavailable.
 
 ## Project Structure
 
-Only what currently exists in the repo. The menu bar app, views, and HTTP
-server are deferred.
+Only what currently exists in the repo. The setup app is deferred.
 
 ```
 JointChiefs/
@@ -82,13 +81,18 @@ JointChiefs/
 ├── Sources/
 │   ├── JointChiefsCore/
 │   │   ├── Models/
+│   │   │   └── StrategyConfig.swift         (moderator/tiebreaker/consensus/rounds/timeout)
 │   │   ├── Errors/
 │   │   └── Services/
-│   │       ├── KeychainService.swift
+│   │       ├── APIKeyResolver.swift         (env → keygetter; CLI + MCP funnel through it)
+│   │       ├── KeychainService.swift        (used *only* by the keygetter binary)
+│   │       ├── StrategyConfigStore.swift    (load/save ~/Library/Application Support/…)
 │   │       ├── ConsensusBuilder.swift
 │   │       ├── DebateOrchestrator.swift
 │   │       └── Providers/  (OpenAI, Gemini, Grok, Anthropic, Ollama)
-│   └── JointChiefsCLI/  (executable: jointchiefs)
+│   ├── JointChiefsCLI/                       (executable: jointchiefs)
+│   ├── JointChiefsMCP/                       (executable: jointchiefs-mcp — stdio only)
+│   └── JointChiefsKeygetter/                 (executable: jointchiefs-keygetter)
 └── Tests/JointChiefsCoreTests/
 ```
 
@@ -123,49 +127,10 @@ The core engine. Manages the full review lifecycle:
 3. **Consensus Phase:** Passes all findings + debate history to `ConsensusBuilder`, which produces the final `ConsensusSummary`.
 4. **Storage:** Saves full `DebateTranscript` to SwiftData. Returns only `ConsensusSummary` to caller.
 
-### Local HTTP Server
-
-Embedded Hummingbird server running on localhost:7777.
-
-**Endpoints:**
-| Method | Path | Purpose |
-|---|---|---|
-| POST | `/review` | Submit code for review |
-| GET | `/status` | Server health check |
-| GET | `/models` | List configured providers |
-
-**Request format:**
-```json
-{
-    "code": "func authenticate(...) { ... }",
-    "filePath": "src/auth.swift",
-    "goal": "security audit",
-    "context": "OAuth2 implementation for user login"
-}
-```
-
-**Response format:**
-```json
-{
-    "findings": [
-        {
-            "severity": "critical",
-            "title": "Race condition in token refresh",
-            "description": "Concurrent requests can trigger multiple refresh cycles",
-            "agreement": "unanimous",
-            "recommendation": "Add actor isolation to TokenManager"
-        }
-    ],
-    "recommendation": "Wrap TokenManager in an actor to prevent...",
-    "modelsConsulted": ["gpt-5", "gemini-3-pro", "grok-3"],
-    "roundsCompleted": 2,
-    "transcriptId": "uuid-for-app-lookup"
-}
-```
-
 ### CLI Tool
 
-Swift ArgumentParser executable that hits the local server:
+Swift ArgumentParser executable that calls `DebateOrchestrator` directly — no
+local HTTP server in between.
 
 ```bash
 # Basic review
@@ -177,16 +142,54 @@ jointchiefs review src/auth.swift --goal "security audit"
 # Review a git diff
 git diff | jointchiefs review --stdin --goal "pre-commit check"
 
-# Check server status
-jointchiefs status
-
-# List configured models
+# List configured models (status only)
 jointchiefs models
+
+# Probe each configured provider's API
+jointchiefs models --test
 ```
 
-### MCP Server (Optional)
+### MCP Server
 
-Thin stdio wrapper that proxies to the local HTTP server. Registered in Claude Code's MCP config. Exposes a single `joint_chiefs_review` tool that calls `POST /review` internally.
+Standalone stdio executable (`jointchiefs-mcp`) that wraps the orchestrator
+directly. Uses `modelcontextprotocol/swift-sdk` pinned to exact `0.12.0`.
+Spawned by AI clients (Claude Code, Claude Desktop, Cursor) via JSON-RPC over
+stdin/stdout. Exposes a single `joint_chiefs_review` tool.
+
+**Stdio-only invariant.** Network transports (HTTP, SSE, WebSocket) are
+architecturally prohibited — every security assumption depends on the MCP
+client owning our stdio by definition.
+
+### APIKeyResolver and `jointchiefs-keygetter`
+
+Instead of embedding Keychain access in every binary, only one signed binary
+(`jointchiefs-keygetter`) is permitted to touch Joint Chiefs' Keychain items.
+The CLI and MCP server invoke it via `Process` and read the key from stdout.
+This was validated empirically in `prototypes/keychain-access/` — a single
+trusted identity avoids cross-binary ACL churn when any of the surfaces is
+updated in place.
+
+Resolution priority:
+
+1. **Environment variable** (CI escape hatch). `OPENAI_API_KEY`,
+   `ANTHROPIC_API_KEY`, etc. If set and non-empty, it wins.
+2. **Keygetter invocation.** `APIKeyResolver.locateKeygetter()` tries
+   `$JOINTCHIEFS_KEYGETTER_PATH`, the caller's sibling directory, and
+   `/Applications/Joint Chiefs.app/Contents/Resources/`. The keygetter is
+   spawned with `read <account>`; its stdout is the raw key (no trailing
+   newline).
+3. **Nil.** Provider is treated as "not configured."
+
+Exit code contract (callers depend on these):
+
+| Exit | Meaning |
+|---|---|
+| 0 | Success — key on stdout |
+| 2 | Keychain encode/decode failure |
+| 3 | Item not found (resolver returns nil, not an error) |
+| 4 | Interaction required (headless failure — throws) |
+| 5 | Other keychain error |
+| 64 | Usage error |
 
 ## Data Flow
 
@@ -265,8 +268,15 @@ streaming rather than waiting for the full response body.
 
 ## Configuration
 
-Joint Chiefs reads provider configuration from environment variables at
-launch. API keys are required; model overrides are optional.
+Provider API keys are resolved via `APIKeyResolver` (env var → keygetter). The
+env var is a CI-only escape hatch; end users add keys via the setup app, which
+writes them to the Keychain through the keygetter.
+
+Other settings — moderator selection, consensus mode, tiebreaker, rounds,
+timeouts, rate limits — live in `StrategyConfig` and are persisted to
+`~/Library/Application Support/Joint Chiefs/strategy.json` (file mode 0600).
+CLI flags override per-invocation. `StrategyConfigStore.load()` falls back
+silently to `.default` when the file is missing or malformed.
 
 | Variable | Purpose | Default |
 |---|---|---|
@@ -289,11 +299,22 @@ Claude model for per-round reviews and a larger one for the final call.
 
 ## Security Model
 
-- **API keys** stored in macOS Keychain via `Security` framework. Never written to disk in plaintext.
-- **Local server** binds to `127.0.0.1` only. Not accessible from other machines on the network.
-- **No telemetry.** No analytics. No external connections except configured LLM API endpoints.
-- **Code sent for review** is stored only in the local transcript database. User can delete transcripts at any time.
+- **API keys** live in the macOS Keychain, accessed exclusively by a single
+  signed binary (`jointchiefs-keygetter`). The CLI and MCP server invoke it
+  via `Process` and drop the key immediately after use — see the
+  `APIKeyResolver` and keygetter sections above.
+- **Env vars are CI-only fallback.** Documented as such in SECURITY.md and
+  the setup app's first-run screen. Not the default path for end users.
+- **No local HTTP server.** The CLI calls the orchestrator directly; the MCP
+  server is stdio-only. Nothing binds a port.
+- **No telemetry.** No analytics. No external connections except configured
+  LLM API endpoints.
+- **Code sent for review** is stored only in the local transcript files. User
+  can delete transcripts at any time.
 - **Provider responses** are not cached beyond the transcript.
+- **Distribution** uses Apple Developer ID signing + notarization, with
+  Sparkle for updates — matching the security baseline of Chris's other apps.
+  No custom updater, no YubiKey root, no XPC.
 
 ## Performance Targets
 
@@ -318,3 +339,4 @@ Claude model for per-round reviews and a larger one for the final call.
 |---|---|---|
 | 1.0 | 2026-04-08 | Initial architecture |
 | 1.1 | 2026-04-09 | Reflect current state: hub-and-spoke debate with Claude as moderator, SSE streaming via `URLSession.bytes`, HTTP server deferred, project structure trimmed to what actually exists, environment-variable configuration documented, 5 providers including Anthropic. |
+| 1.2 | 2026-04-18 | v2 scope: added `jointchiefs-mcp` stdio server target, `jointchiefs-keygetter` as sole Keychain identity, `APIKeyResolver` as the env/keygetter funnel, `StrategyConfig` + `StrategyConfigStore` for moderator/consensus/rounds persistence. Removed the stale local-HTTP-server section. Security model updated for lean-baseline direction (Developer ID + notarization + Sparkle, no XPC, no custom updater). |

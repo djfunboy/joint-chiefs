@@ -155,6 +155,28 @@ public enum ConsensusBuilder {
         )
     }
 
+    // MARK: - Filtering
+
+    /// Returns a new `ConsensusSummary` with findings filtered by `predicate`. The
+    /// recommendation is rebuilt from the surviving findings so it stays in sync.
+    ///
+    /// Used by `DebateOrchestrator` when the configured `ConsensusMode` is
+    /// `.strictMajority` or `.votingThreshold` — both modes drop findings from the
+    /// code-based summary without invoking a moderator.
+    public static func filter(
+        _ summary: ConsensusSummary,
+        keeping predicate: (Finding) -> Bool
+    ) -> ConsensusSummary {
+        let kept = summary.findings.filter(predicate)
+        return ConsensusSummary(
+            findings: kept,
+            recommendation: buildRecommendation(from: kept),
+            modelsConsulted: summary.modelsConsulted,
+            roundsCompleted: summary.roundsCompleted,
+            transcriptId: summary.transcriptId
+        )
+    }
+
     // MARK: - Between-Round Synthesis
 
     /// Asks the moderator (Claude) to consolidate a round's findings into a concise brief.

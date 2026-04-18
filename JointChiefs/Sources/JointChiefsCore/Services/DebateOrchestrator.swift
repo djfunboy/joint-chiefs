@@ -13,23 +13,53 @@ public actor DebateOrchestrator {
     // MARK: - Private Properties
 
     private let providers: [any ReviewProvider]
-    private let consensusProvider: (any ReviewProvider)?
-    private let debateRounds: Int
-    private let timeoutSeconds: Int
+    private let moderator: (any ReviewProvider)?
+    private let tiebreaker: (any ReviewProvider)?
+    private let strategy: StrategyConfig
     private let logger = Logger(subsystem: "com.jointchiefs", category: "DebateOrchestrator")
+
+    private var debateRounds: Int { strategy.maxRounds }
+    private var timeoutSeconds: Int { strategy.timeoutSeconds }
 
     // MARK: - Init
 
+    /// Primary initializer. Takes an explicit moderator (between-round synthesis and,
+    /// when no tiebreaker is supplied, the final decider in `.moderatorDecides` mode),
+    /// an optional tiebreaker that overrides the moderator for the final decision,
+    /// and a `StrategyConfig` that governs rounds, timeout, and consensus mode.
+    ///
+    /// Pass `moderator: nil` to run without any LLM-based synthesis — the orchestrator
+    /// falls back to code-based consensus in every mode.
+    public init(
+        providers: [any ReviewProvider],
+        moderator: (any ReviewProvider)? = nil,
+        tiebreaker: (any ReviewProvider)? = nil,
+        strategy: StrategyConfig = .default
+    ) {
+        self.providers = providers
+        self.moderator = moderator
+        self.tiebreaker = tiebreaker
+        self.strategy = strategy
+    }
+
+    /// Back-compat initializer preserving the pre-StrategyConfig signature. Used by
+    /// existing tests and any external callers that haven't migrated yet. Internally
+    /// delegates to the primary init with a synthesized strategy.
     public init(
         providers: [any ReviewProvider],
         consensusProvider: (any ReviewProvider)? = nil,
         debateRounds: Int = 5,
         timeoutSeconds: Int = 120
     ) {
-        self.providers = providers
-        self.consensusProvider = consensusProvider
-        self.debateRounds = debateRounds
-        self.timeoutSeconds = timeoutSeconds
+        self.init(
+            providers: providers,
+            moderator: consensusProvider,
+            tiebreaker: nil,
+            strategy: StrategyConfig(
+                maxRounds: debateRounds,
+                timeoutSeconds: timeoutSeconds
+            )
+        )
     }
 
     // MARK: - Public Methods
@@ -68,8 +98,9 @@ public actor DebateOrchestrator {
         for roundNumber in 0..<debateRounds {
             let round = roundNumber + 1
 
-            // If we have a moderator, synthesize before sending to generals
-            if let moderator = consensusProvider {
+            // Between-round synthesis runs for every consensus mode — it's a
+            // prompt-compaction pass, not a decision, so the final mode is irrelevant here.
+            if let moderator {
                 synthesizedFindings = (try? await ConsensusBuilder.synthesizeRound(
                     findings: synthesizedFindings,
                     code: context.code,
@@ -103,25 +134,22 @@ public actor DebateOrchestrator {
         }
 
         // Phase 3: Consensus synthesis
-        // Build consensus from the final round. If findings are still split,
-        // escalate to the deciding model (Claude) as tiebreaker.
+        // Build code-based consensus from the final round, then branch on the
+        // configured ConsensusMode to decide whether to filter, include all,
+        // or hand off to a deciding LLM.
         let codeSummary = ConsensusBuilder.synthesize(
             transcript: transcript,
             providers: providers
         )
 
-        let summary: ConsensusSummary
-        let hasSplits = codeSummary.findings.contains { $0.agreement == .split || $0.agreement == .solo }
-        if hasSplits, let decider = consensusProvider {
-            summary = try await ConsensusBuilder.synthesizeWithModel(
-                transcript: transcript,
-                providers: providers,
-                decidingModel: decider,
-                timeoutSeconds: timeoutSeconds
-            )
-        } else {
-            summary = codeSummary
-        }
+        let summary = try await Self.applyConsensusMode(
+            codeSummary: codeSummary,
+            transcript: transcript,
+            providers: providers,
+            moderator: moderator,
+            tiebreaker: tiebreaker,
+            strategy: strategy
+        )
         transcript.consensusSummary = summary
         transcript.status = .completed
 
@@ -134,9 +162,10 @@ public actor DebateOrchestrator {
     /// The stream completes after emitting `.completed` or `.failed`.
     public func runReviewStreaming(context: ReviewContext) -> AsyncStream<ReviewEvent> {
         let providers = self.providers
-        let consensusProvider = self.consensusProvider
-        let debateRounds = self.debateRounds
-        let timeoutSeconds = self.timeoutSeconds
+        let moderator = self.moderator
+        let tiebreaker = self.tiebreaker
+        let strategy = self.strategy
+        let debateRounds = strategy.maxRounds
 
         return AsyncStream { continuation in
             Task {
@@ -207,7 +236,7 @@ public actor DebateOrchestrator {
                         let round = roundNumber + 1
 
                         // Moderator synthesizes before sending to generals
-                        if let moderator = consensusProvider {
+                        if let moderator {
                             continuation.yield(.moderatorSynthesizing(round: round))
                             if let consolidated = try? await ConsensusBuilder.synthesizeRound(
                                 findings: synthesizedFindings,
@@ -268,25 +297,20 @@ public actor DebateOrchestrator {
                     }
 
                     // Phase 3: Consensus
+                    continuation.yield(.buildingConsensus)
                     let codeSummary = ConsensusBuilder.synthesize(
                         transcript: transcript,
                         providers: providers
                     )
 
-                    let hasSplits = codeSummary.findings.contains { $0.agreement == .split || $0.agreement == .solo }
-                    let summary: ConsensusSummary
-                    if hasSplits, let decider = consensusProvider {
-                        continuation.yield(.buildingConsensus)
-                        summary = try await ConsensusBuilder.synthesizeWithModel(
-                            transcript: transcript,
-                            providers: providers,
-                            decidingModel: decider,
-                            timeoutSeconds: timeoutSeconds
-                        )
-                    } else {
-                        continuation.yield(.buildingConsensus)
-                        summary = codeSummary
-                    }
+                    let summary = try await Self.applyConsensusMode(
+                        codeSummary: codeSummary,
+                        transcript: transcript,
+                        providers: providers,
+                        moderator: moderator,
+                        tiebreaker: tiebreaker,
+                        strategy: strategy
+                    )
                     transcript.consensusSummary = summary
                     transcript.status = .completed
 
@@ -391,6 +415,63 @@ public actor DebateOrchestrator {
     private func collectFindings(from transcript: DebateTranscript) -> [Finding] {
         transcript.rounds.flatMap { round in
             round.responses.flatMap { $0.findings }
+        }
+    }
+
+    /// Applies the configured `ConsensusMode` to a code-based summary, optionally invoking
+    /// the deciding LLM. Static so both `runReview` (actor-isolated) and `runReviewStreaming`
+    /// (Task-captured) can call it without re-deriving the logic.
+    ///
+    /// - `.moderatorDecides` — if any finding is split/solo and a decider exists
+    ///   (`tiebreaker ?? moderator`), hand the transcript to that model. Otherwise
+    ///   return the code-based summary unchanged.
+    /// - `.strictMajority` — drop every finding whose agreement is not unanimous
+    ///   or majority. No LLM call.
+    /// - `.bestOfAll` — return the code-based summary unchanged (it already
+    ///   includes every finding at every agreement level).
+    /// - `.votingThreshold` — drop findings whose raised-by ratio falls below
+    ///   `strategy.thresholdPercent`. Denominator is the number of providers that
+    ///   responded in the final round (matches how `AgreementLevel` is computed).
+    private static func applyConsensusMode(
+        codeSummary: ConsensusSummary,
+        transcript: DebateTranscript,
+        providers: [any ReviewProvider],
+        moderator: (any ReviewProvider)?,
+        tiebreaker: (any ReviewProvider)?,
+        strategy: StrategyConfig
+    ) async throws -> ConsensusSummary {
+        switch strategy.consensus {
+        case .moderatorDecides:
+            let decider = tiebreaker ?? moderator
+            let hasSplits = codeSummary.findings.contains {
+                $0.agreement == .split || $0.agreement == .solo
+            }
+            guard hasSplits, let decider else {
+                return codeSummary
+            }
+            return try await ConsensusBuilder.synthesizeWithModel(
+                transcript: transcript,
+                providers: providers,
+                decidingModel: decider,
+                timeoutSeconds: strategy.timeoutSeconds
+            )
+
+        case .strictMajority:
+            return ConsensusBuilder.filter(codeSummary) {
+                $0.agreement == .unanimous || $0.agreement == .majority
+            }
+
+        case .bestOfAll:
+            return codeSummary
+
+        case .votingThreshold:
+            let total = transcript.rounds.last?.responses.count ?? providers.count
+            guard total > 0 else { return codeSummary }
+            let threshold = strategy.thresholdPercent
+            return ConsensusBuilder.filter(codeSummary) { finding in
+                let raised = finding.raisedBy?.count ?? 0
+                return Double(raised) / Double(total) >= threshold
+            }
         }
     }
 

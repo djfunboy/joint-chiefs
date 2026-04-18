@@ -1,15 +1,19 @@
 # Joint Chiefs — Known Issues
 
-**Last Updated:** 2026-04-16
+**Last Updated:** 2026-04-18
 
 A running list of known bugs, limitations, and rough edges. PRs that fix any of these are welcome.
 
 ## Active Bugs
 
-_None currently tracked — file an issue if you hit something._
+- **Anthropic consensus renders raw JSON inside finding descriptions.** The consensus builder's synthesis path occasionally surfaces the deciding model's JSON payload verbatim in `Finding.description` instead of the parsed fields. Similar in shape to the `parseFindings` fence-stripping bug fixed in commit `8bfa1a8` but in `ConsensusBuilder.synthesizeWithModel`. Fix during the next consensus-rendering touch.
 
 ## Known Limitations
 
+- **MCP SDK pinned pre-1.0.** `modelcontextprotocol/swift-sdk` is pinned to exact `0.12.0` in `Package.swift`. Review the SDK's release notes before bumping — the protocol and API surface may change across 0.x versions.
+- **Dev-built keygetter uses ad-hoc code signature.** `swift build` produces an ad-hoc-signed `jointchiefs-keygetter`. That identity works for local Keychain access but is *not* the identity that end-user Keychain items are scoped to. Release builds must re-sign with `codesign --sign <Developer ID> --identifier com.jointchiefs.keygetter <path>` — the designated requirement derived from that signature is what `kc-keygetter-prototype` validated as stable across updates.
+- **Keygetter discovery is best-effort.** `APIKeyResolver.locateKeygetter` checks `JOINTCHIEFS_KEYGETTER_PATH`, sibling-of-caller, and `/Applications/Joint Chiefs.app/Contents/Resources/`. If a user installs the app bundle elsewhere, they need to set the env var. Document in SECURITY.md before launch.
+- **StrategyConfig not yet fully wired into DebateOrchestrator.** The type, store, and moderator/tiebreaker helpers exist in `JointChiefsCore`, but `DebateOrchestrator` still takes the pre-v2 `consensusProvider` + `debateRounds` + `timeoutSeconds` init. Resume at task #15 — see `tasks/SESSION-HANDOFF-2026-04-18.md`.
 - **Streaming task is not cancelled on early termination.** `runReviewStreaming` creates an unstructured `Task` inside the `AsyncStream` but doesn't wire `continuation.onTermination` to cancel it when the consumer stops iterating. Long debates keep running in the background after a CLI Ctrl-C.
 - **Duplicate orchestration paths.** `runReview` and `runReviewStreaming` implement substantially the same workflow in parallel. Bug fixes need to be applied to both.
 - **No validation on `debateRounds`.** `DebateOrchestrator.init` accepts negative values without complaint.

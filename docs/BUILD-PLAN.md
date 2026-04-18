@@ -1,22 +1,28 @@
 # Joint Chiefs — Build Plan
 
-**Version:** 1.1
-**Last Updated:** 2026-04-08
+**Version:** 1.2
+**Last Updated:** 2026-04-18
 
 ## What's Built
 
-Joint Chiefs is a working CLI tool. Running `jointchiefs review <file> --goal "..."` in any terminal produces a streaming, multi-model code review with a final consensus summary.
+Joint Chiefs has matured from "solo-use CLI" into a three-surface product in
+progress: CLI, stdio MCP server, and (still to come) a setup app.
 
-- **CLI installed** at `/opt/homebrew/bin/jointchiefs` (Apple Silicon only) — direct execution, no local HTTP server required
-- **5 providers live:** OpenAI, Google Gemini, xAI Grok, Anthropic Claude, plus optional Ollama
-- **Streaming SSE** from every provider — tokens appear live as each model speaks
-- **Hub-and-spoke debate:** OpenAI / Gemini / Grok are spokes, Claude is the moderator/decider
-- **Adaptive rounds:** up to 5 debate rounds with early break when consensus is reached
-- **Anonymous synthesis:** model identities stripped before Claude writes the final decision (reduces bias)
-- **Config via env vars:** `OPENAI_API_KEY`, `GEMINI_API_KEY`, `GROK_API_KEY`, `ANTHROPIC_API_KEY`, `OLLAMA_ENABLED=1`, plus `*_MODEL` overrides
-- **34 tests passing** (unit + orchestrator integration with mock providers)
+- **CLI** (`jointchiefs`) — streaming multi-model review, same UX as v1
+- **MCP server** (`jointchiefs-mcp`) — stdio-only; initialize + tools/list smoke-tested
+- **Keygetter** (`jointchiefs-keygetter`) — single signed binary authoritative over Keychain access
+- **`APIKeyResolver`** — env var first (CI fallback), then keygetter; CLI and MCP both funnel through it
+- **`StrategyConfig` + `StrategyConfigStore`** — moderator, consensus mode, tiebreaker, rounds, timeouts, rate limits, persisted to `~/Library/Application Support/Joint Chiefs/strategy.json`
+- **5 providers live:** OpenAI, Gemini, Grok, Anthropic Claude, Ollama — all SSE-streamed
+- **Hub-and-spoke debate:** OpenAI / Gemini / Grok are spokes, Claude is moderator/decider; adaptive early break on convergence
+- **Anonymous synthesis:** model identities stripped before the deciding model writes the final decision
+- **52 tests passing** (unit + orchestrator integration + APIKeyResolver with fake-keygetter harness)
 
-Phases 1-5 are complete. Phase 6+ (menu bar app, transcript viewer, MCP wrapper) are deferred — the CLI with env-var config covers the solo-use workflow.
+Phases 1–3, 5, and the original Phase 8 (MCP wrapper) have real output. Phase 6
+(setup app) is the next build surface. v2 adds dedicated security/distribution
+work captured in tasks/SECURITY-AND-DIRECTION-PLAN-v2.md — with the lean
+baseline correction: Apple Developer ID + notarization + Sparkle, no YubiKey,
+no custom updater, no XPC.
 
 ## Pre-Build Checklist
 
@@ -126,20 +132,29 @@ Phases 1-5 are complete. Phase 6+ (menu bar app, transcript viewer, MCP wrapper)
 
 ---
 
-## Phase 6: Menu Bar App & Settings UI ⏸️ DEFERRED
+## Phase 6: Setup App 🟡 IN PROGRESS
 
-**Goal (original):** Working menu bar app with settings for providers and review parameters.
+**Goal:** Single-window SwiftUI app that lets end users add API keys and pick a
+strategy without touching env vars or the CLI. One-shot installer pattern —
+open once, configure, quit.
 
-**Why deferred:** Environment variables cover provider configuration fully for a solo developer. A settings UI is nice-to-have but adds Keychain integration, SwiftData persistence, launch-at-login, and menu bar state management — all for convenience Chris doesn't need yet. Revisit if configuration friction becomes real.
+**Why now (vs. deferred in v1):** Two of v2's surfaces — the MCP server and
+(soon) a Developer-ID-signed CLI — are now on a distribution path where end
+users can't reasonably be asked to export env vars. The setup app is the
+surface that writes keys to the Keychain (via the keygetter) and persists
+`StrategyConfig`.
 
-**Steps:** _(unchanged from v1.0, deferred)_
-1. Menu bar icon with status (idle / reviewing / error)
-2. Settings window: add/remove/reorder providers
-3. API key entry with Keychain storage
-4. Test Connection button per provider
-5. Review parameters UI (rounds, timeout, severity threshold, default goal)
-6. Launch at login toggle
-7. Server port configuration
+**Steps:**
+1. ✅ `StrategyConfig` type defined in `JointChiefsCore`
+2. ✅ `StrategyConfigStore` load/save helpers
+3. ✅ `APIKeyResolver` consumed by CLI + MCP (no direct env reads in hot paths)
+4. ✅ `jointchiefs-keygetter` executable as the sole Keychain identity
+5. [ ] SwiftUI app target with the provider-keys screen (list of providers, masked entry, Test button per key)
+6. [ ] Strategy panel (moderator dropdown, consensus-mode radio, tiebreaker dropdown, rounds/timeout sliders)
+7. [ ] Install-location picker (`~/.local/bin/` default, Homebrew prefix detection, custom)
+8. [ ] PATH-on-install helper (detect `~/.local/bin` on `$PATH`, offer to append to `~/.zshrc`)
+9. [ ] MCP config snippet generator (keyless — keys live in Keychain)
+10. [ ] First-run data-handling disclosure screen
 
 ---
 
@@ -159,22 +174,24 @@ Phases 1-5 are complete. Phase 6+ (menu bar app, transcript viewer, MCP wrapper)
 
 ---
 
-## Phase 8: MCP Server Wrapper ⏸️ FUTURE
+## Phase 8: MCP Server 🟡 IN PROGRESS
 
-**Goal:** Claude Code native integration via MCP.
+**Goal:** Claude Code / Claude Desktop / Cursor native integration via MCP.
 
-**Why future (not just deferred):** This is the highest-value next phase once the CLI is proven in daily use. Would expose `joint_chiefs_review` as a native tool inside Claude Code, letting Claude autonomously request a multi-model review during a coding session instead of Chris shelling out manually.
-
-**Steps:** _(unchanged from v1.0, future work)_
-1. Create thin MCP server (stdio) that wraps the orchestrator directly
-2. Expose `joint_chiefs_review` tool with code, filePath, goal parameters
-3. Register in Claude Code MCP config
-4. Document setup in README
+**Steps:**
+1. ✅ Adopt `modelcontextprotocol/swift-sdk` (pinned exact `0.12.0`)
+2. ✅ Stdio-only server (`jointchiefs-mcp`) with `joint_chiefs_review` tool
+3. ✅ Smoke-tested — `initialize` + `tools/list` round-trip cleanly
+4. ✅ Installed at `/opt/homebrew/bin/jointchiefs-mcp`
+5. [ ] Wire `APIKeyResolver` (done) + `StrategyConfig` (in progress) into MCP tool invocation
+6. [ ] Rate limits: 1 concurrent review, 30/hour cap, cancel on stdin close
+7. [ ] Register in Claude Code MCP config; document in README
 
 **Checkpoint:**
-- [ ] From Claude Code: calling `joint_chiefs_review` returns consensus summary
-- [ ] MCP server starts/stops cleanly
-- [ ] Streaming output forwarded through MCP where supported
+- [x] From Claude Code: calling `joint_chiefs_review` returns consensus summary (pre-rate-limit / pre-strategy)
+- [x] MCP server starts/stops cleanly
+- [ ] Rate limits enforced and logged to stderr
+- [ ] Graceful cancellation on client disconnect
 
 ---
 
@@ -183,18 +200,42 @@ Phases 1-5 are complete. Phase 6+ (menu bar app, transcript viewer, MCP wrapper)
 **Goal:** Production-ready quality.
 
 **Steps:**
-1. ✅ Orchestrator integration tests with mock providers (34 tests passing)
+1. ✅ Orchestrator integration tests with mock providers (52 tests passing)
 2. ✅ Error handling audit for provider failure paths
-3. [ ] Accessibility pass — N/A until menu bar app lands (Phase 6)
-4. [ ] Performance profiling: memory, latency per full review cycle
-5. [ ] Documentation: README with setup instructions
+3. ✅ APIKeyResolver env/keygetter precedence covered with fake-keygetter harness
+4. [ ] Accessibility pass — surface in Phase 6 (setup app)
+5. [ ] Performance profiling: memory, latency per full review cycle
+6. [ ] Documentation: README restructure for three-surface product
 
 **Checkpoint:**
-- [x] All tests pass (34 passing)
+- [x] All tests pass (52 passing)
 - [x] Zero warnings in build
-- [ ] VoiceOver works on all interactive elements — deferred with Phase 6
+- [ ] VoiceOver works on all interactive elements — with Phase 6
 - [ ] Idle memory profiled
 - [ ] Full review cycle latency measured with 3+ models, 5 adaptive rounds
+
+---
+
+## Phase 10: Security & Distribution 🟡 IN PROGRESS
+
+**Goal:** Sign, notarize, and auto-update. Match the security baseline of
+Chris's other 10 apps (Apple Developer ID + notarization + Sparkle).
+
+**Source of truth:** `tasks/SECURITY-AND-DIRECTION-PLAN-v2.md` plus the user's
+lean-baseline correction — the v2 plan's YubiKey/XPC/custom-updater items are
+reversed in favor of the standard Apple Developer flow.
+
+**Steps:**
+1. ✅ Keychain-access prototype validating Option B (single signed keygetter)
+2. ✅ `jointchiefs-keygetter` target building and producing expected exit codes
+3. [ ] Release signing script: sign `jointchiefs`, `jointchiefs-mcp`, `jointchiefs-keygetter` with Developer ID; keygetter with `--identifier com.jointchiefs.keygetter`
+4. [ ] Notarization workflow
+5. [ ] DMG artifact with app bundle + CLIs in `Contents/Resources/`
+6. [ ] Sparkle integration (appcast.xml on jointchiefs.ai)
+7. [ ] URLSession redirect-authorization-stripping delegate (shared across providers)
+8. [ ] MCP rate limiting (1 concurrent, 30/hour, cancel on stdin close)
+9. [ ] SECURITY.md written
+10. [ ] Open-source README restructured for three surfaces + public issue tracker
 
 ---
 
@@ -211,3 +252,4 @@ Phases 1-5 are complete. Phase 6+ (menu bar app, transcript viewer, MCP wrapper)
 |---|---|---|
 | 1.0 | 2026-04-08 | Initial build plan — 9 phases |
 | 1.1 | 2026-04-08 | Phases 1-3, 5 marked complete. Phase 4, 6, 7 deferred. Phase 8 marked future. Phase 9 partial. Added "What's Built" section. Anthropic provider added to Phase 2 scope. Hub-and-spoke architecture and adaptive break documented in Phase 3. |
+| 1.2 | 2026-04-18 | v2 scope: Phase 6 (setup app) and Phase 8 (MCP server) moved to in-progress. Added Phase 10 (security & distribution) with the lean security baseline. "What's Built" now lists keygetter + APIKeyResolver + StrategyConfig/Store + MCP server scaffold. Test count updated to 52. |
