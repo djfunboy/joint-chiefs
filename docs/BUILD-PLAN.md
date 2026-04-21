@@ -1,7 +1,7 @@
 # Joint Chiefs — Build Plan
 
-**Version:** 1.3
-**Last Updated:** 2026-04-19
+**Version:** 1.4
+**Last Updated:** 2026-04-20
 
 ## What's Built
 
@@ -18,14 +18,18 @@ progress: CLI, stdio MCP server, and (still to come) a setup app.
 - **Anonymous synthesis:** model identities stripped before the deciding model writes the final decision
 - **Four consensus modes wired through `DebateOrchestrator`:** `moderatorDecides`, `strictMajority`, `bestOfAll`, `votingThreshold` — with weighted voting when `providerWeights` is configured
 - **Per-provider weighting:** `StrategyConfig.providerWeights` drives panel inclusion (weight 0 = excluded) and voting-threshold math; surfaced in the setup app
-- **Setup app scaffold:** `jointchiefs-setup` SwiftUI executable target with Disclosure / Keys / Roles-&-Weights / Install / MCP-Config screens
+- **Setup app scaffold:** `jointchiefs-setup` SwiftUI executable target with Disclosure / Keys / Roles-&-Weights / Install / MCP-Config screens — all five views migrated to Agentdeck tokens (`agentBgPanel`, `agentDialogTitle`, `AgentInputStyle`, `AgentPill`, `AgentChip`, `agentPanel`, `.agentPrimary` / `.agentSecondary` / `.agentDanger` button styles)
+- **Website live at [jointchiefs.ai](https://jointchiefs.ai/)** — static site deployed via Netlify. Source in the private `djfunboy/joint-chiefs-website` repo. Custom domain + Let's Encrypt cert configured.
 - **60 tests passing** (unit + orchestrator integration + consensus-mode coverage + weighted-voting + APIKeyResolver with fake-keygetter harness)
 
-Phases 1–3, 5, and the original Phase 8 (MCP wrapper) have real output. Phase 6
-(setup app) is the next build surface. v2 adds dedicated security/distribution
-work captured in tasks/SECURITY-AND-DIRECTION-PLAN-v2.md — with the lean
-baseline correction: Apple Developer ID + notarization + Sparkle, no YubiKey,
-no custom updater, no XPC.
+Phases 1–3 and 5 are complete. Phase 6 (setup app) ships as a scaffold with
+every view token-migrated; app-icon, signing, notarization, and real Keychain
+round-trip QA remain. Phase 8 (MCP server) ships the scaffold + one tool; rate
+limits and StrategyConfig wiring remain. Phase 10 (security + distribution) has
+the website deployed; signing + notarization + Sparkle integration remain.
+v2 security work is captured in tasks/SECURITY-AND-DIRECTION-PLAN-v2.md — with
+the lean baseline correction: Apple Developer ID + notarization + Sparkle,
+no YubiKey, no custom updater, no XPC.
 
 ## Pre-Build Checklist
 
@@ -135,7 +139,7 @@ no custom updater, no XPC.
 
 ---
 
-## Phase 6: Setup App 🟢 SCAFFOLD COMPLETE
+## Phase 6: Setup App 🟢 SCAFFOLD + DESIGN-SYSTEM MIGRATION COMPLETE
 
 **Goal:** Single-window SwiftUI app that lets end users add API keys and pick a
 strategy without touching env vars or the CLI. One-shot installer pattern —
@@ -158,6 +162,7 @@ surface that writes keys to the Keychain (via the keygetter) and persists
 8. ✅ PATH-on-install helper (detects destination on `$PATH`, shows the exact `export` line when missing)
 9. ✅ MCP config snippet generator (keyless — reads destination path, outputs a standard `mcpServers` JSON block with a Copy button)
 10. ✅ First-run data-handling disclosure screen (what is sent off-device, what stays local, what the app doesn't do)
+11. ✅ All five views migrated to the Agentdeck design system — tokens in `JointChiefsSetup/DesignSystem/` (AgentdeckTokens, AgentdeckTypography, AgentdeckButtonStyle, AgentdeckComponents). No hex/CGFloat literals in any view. Components added: `AgentInputStyle` ViewModifier (dashed warm-tan focus), `agentPanel` View modifier, `AgentPill` (tinted status), `AgentChip` (picker replacement), `AgentSectionHeader` (uppercase eyebrow).
 
 **Remaining before distribution (tracked under Phase 10):**
 - App icon (`Resources/AppIcon.icns` + `CFBundleIconFile`). The bundle is functional without one; Finder just shows a generic icon.
@@ -232,10 +237,10 @@ app runs from the bundle, and via flat-sibling when it runs from
 3. ✅ APIKeyResolver env/keygetter precedence covered with fake-keygetter harness
 4. [ ] Accessibility pass — VoiceOver/Dynamic Type on the setup app
 5. [ ] Performance profiling: memory, latency per full review cycle
-6. [ ] Documentation: README restructure for three-surface product (four now — CLI, MCP, setup, keygetter)
+6. ✅ Documentation: README restructured for four-surface product (CLI, MCP, setup, keygetter); CLAUDE.md + all docs/*.md synced 2026-04-20
 
 **Checkpoint:**
-- [x] All tests pass (52 passing)
+- [x] All tests pass (60 passing)
 - [x] Zero warnings in build
 - [ ] VoiceOver works on all interactive elements — with Phase 6
 - [ ] Idle memory profiled
@@ -255,14 +260,16 @@ reversed in favor of the standard Apple Developer flow.
 **Steps:**
 1. ✅ Keychain-access prototype validating Option B (single signed keygetter)
 2. ✅ `jointchiefs-keygetter` target building and producing expected exit codes
-3. [ ] Release signing script: sign `jointchiefs`, `jointchiefs-mcp`, `jointchiefs-keygetter` with Developer ID; keygetter with `--identifier com.jointchiefs.keygetter`
-4. [ ] Notarization workflow
-5. [ ] DMG artifact with app bundle + CLIs in `Contents/Resources/`
-6. [ ] Sparkle integration (appcast.xml on jointchiefs.ai)
-7. [ ] URLSession redirect-authorization-stripping delegate (shared across providers)
-8. [ ] MCP rate limiting (1 concurrent, 30/hour, cancel on stdin close)
-9. [ ] SECURITY.md written
-10. [ ] Open-source README restructured for three surfaces + public issue tracker
+3. ✅ Public repo shipped — `github.com/djfunboy/joint-chiefs` (MIT)
+4. ✅ Website shipped — `jointchiefs.ai` live via Netlify, custom domain + SSL configured; source in private `djfunboy/joint-chiefs-website` repo
+5. [ ] Release signing script: sign `jointchiefs`, `jointchiefs-mcp`, `jointchiefs-keygetter` with Developer ID; keygetter with `--identifier com.jointchiefs.keygetter`
+6. [ ] Notarization workflow
+7. [ ] DMG artifact with app bundle + CLIs in `Contents/Resources/`
+8. [ ] Sparkle integration (populate appcast.xml on jointchiefs.ai with first notarized release)
+9. [ ] URLSession redirect-authorization-stripping delegate (shared across providers)
+10. [ ] MCP rate limiting (1 concurrent, 30/hour, cancel on stdin close)
+11. [ ] SECURITY.md written
+12. ✅ Open-source README restructured for four surfaces (CLI, MCP, setup, keygetter)
 
 ---
 
@@ -281,3 +288,4 @@ reversed in favor of the standard Apple Developer flow.
 | 1.1 | 2026-04-08 | Phases 1-3, 5 marked complete. Phase 4, 6, 7 deferred. Phase 8 marked future. Phase 9 partial. Added "What's Built" section. Anthropic provider added to Phase 2 scope. Hub-and-spoke architecture and adaptive break documented in Phase 3. |
 | 1.2 | 2026-04-18 | v2 scope: Phase 6 (setup app) and Phase 8 (MCP server) moved to in-progress. Added Phase 10 (security & distribution) with the lean security baseline. "What's Built" now lists keygetter + APIKeyResolver + StrategyConfig/Store + MCP server scaffold. Test count updated to 52. |
 | 1.3 | 2026-04-19 | Phase 6 steps 5-10 complete: `jointchiefs-setup` SwiftUI target scaffolded with Disclosure / Keys / Roles-&-Weights / Install / MCP-Config screens. `StrategyConfig.providerWeights` added — 0 excludes a provider from the panel, positive values drive weighted voting in `.votingThreshold` mode. `APIKeyResolver` gained `writeViaKeygetter` / `deleteViaKeygetter`. `ReviewProvider.providerType` added so the orchestrator can resolve per-provider weight from a provider instance. Test count 52 → 60. Phase 9 step 1 checkpoint updated. |
+| 1.4 | 2026-04-20 | Phase 6 step 11 complete: all five setup-app views migrated to Agentdeck tokens. `AgentdeckComponents.swift` added — `AgentInputStyle`, `agentPanel`, `AgentPill`, `AgentChip`, `AgentSectionHeader`. Phase 10 steps 3–4 complete: public app repo live at `github.com/djfunboy/joint-chiefs`, website shipped to `jointchiefs.ai` via Netlify (custom domain + SSL). Phase 9 step 6 complete: README + CLAUDE.md + all docs synced to four-surface reality and current test counts. Phase 9 checkpoint test count corrected 52 → 60. |

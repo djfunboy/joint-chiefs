@@ -1,6 +1,8 @@
 # Joint Chiefs
 
-Multi-model AI code review from your terminal. One command sends your code to OpenAI, Gemini, Grok, and Claude in parallel, runs a structured debate where they challenge each other's findings, and streams a single consensus summary back.
+Multi-model AI code review. One command sends your code to OpenAI, Gemini, Grok, and Claude in parallel, runs a structured debate where they challenge each other's findings, and streams a single consensus summary back.
+
+**Website:** [jointchiefs.ai](https://jointchiefs.ai/)
 
 ```
 $ jointchiefs review src/auth.swift --goal "security audit"
@@ -12,6 +14,18 @@ Single-model code review has blind spots. GPT misses things Gemini catches; Gemi
 
 The debate protocol is grounded in [Multi-Agent Debate research (Liang et al., 2023)](https://arxiv.org/abs/2305.19118), which shows that adversarial collaboration between LLMs produces more reliable output than any single model — including a single model reflecting on its own work.
 
+## Surfaces
+
+Joint Chiefs ships as three binaries, one engine:
+
+| Binary | Use | How |
+|---|---|---|
+| `jointchiefs` | CLI for terminal, CI, scripting | `jointchiefs review <file>` |
+| `jointchiefs-mcp` | MCP stdio server for any MCP-aware client | Paste the setup app's JSON snippet into your client's MCP config |
+| `jointchiefs-setup` | One-shot SwiftUI installer (macOS) | Handles API key entry, strategy config, installs all three binaries |
+
+A fourth binary, `jointchiefs-keygetter`, is the single signed identity allowed to read/write the Keychain. The CLI and MCP server call it via `Process`.
+
 ## Requirements
 
 - **Apple Silicon Mac** (M-series). Intel Macs are not supported.
@@ -21,14 +35,20 @@ The debate protocol is grounded in [Multi-Agent Debate research (Liang et al., 2
 
 ## Install
 
+### From source
+
 ```bash
-git clone https://github.com/<your-fork>/joint-chiefs.git
+git clone https://github.com/djfunboy/joint-chiefs.git
 cd joint-chiefs/JointChiefs
 swift build -c release
-cp .build/release/jointchiefs /opt/homebrew/bin/jointchiefs
+cp .build/release/jointchiefs .build/release/jointchiefs-mcp .build/release/jointchiefs-keygetter /opt/homebrew/bin/
 ```
 
-Add API keys to your shell profile (`~/.zshrc`):
+### API keys
+
+Two paths:
+
+**a) Environment variables** (CI-friendly):
 
 ```bash
 export OPENAI_API_KEY="sk-..."
@@ -37,9 +57,13 @@ export GROK_API_KEY="..."
 export ANTHROPIC_API_KEY="sk-ant-..."   # also acts as the moderator
 ```
 
+**b) macOS Keychain** (end-user default, via the setup app):
+
+Run `jointchiefs-setup`. It walks through disclosure, key entry (with live Test buttons), strategy config, install location, and outputs the MCP config snippet for your AI client.
+
 You only need one key to get started. More keys = more diverse debate.
 
-Verify the install:
+Verify:
 
 ```bash
 jointchiefs models
@@ -77,6 +101,22 @@ JSON output:
 jointchiefs review src/auth.swift --format json
 ```
 
+## MCP integration
+
+The MCP server (`jointchiefs-mcp`) works with any MCP-aware client. The setup app's **MCP Config** tab emits a ready-to-paste `mcpServers` JSON snippet keyed at the installed binary path. No keys live in the snippet — Joint Chiefs resolves them from the Keychain at tool-call time.
+
+Minimal snippet shape:
+
+```json
+{
+  "mcpServers": {
+    "joint-chiefs": {
+      "command": "/opt/homebrew/bin/jointchiefs-mcp"
+    }
+  }
+}
+```
+
 ## How it works
 
 ```
@@ -101,7 +141,7 @@ jointchiefs review src/auth.swift --format json
        Claude writes the final consensus summary.
 ```
 
-Up to 5 debate rounds with adaptive early break when positions converge. Findings are anonymized before the final synthesis to reduce bias toward any single provider.
+Up to 5 debate rounds with adaptive early break when positions converge. Findings are anonymized before the final synthesis to reduce bias toward any single provider. Four consensus modes (`moderatorDecides`, `strictMajority`, `bestOfAll`, `votingThreshold`) with per-provider weighting.
 
 Full details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
@@ -135,15 +175,16 @@ CLI flags:
 
 ## Privacy
 
-- API keys live in environment variables (or macOS Keychain via `KeychainService`). Never written to disk in plaintext by Joint Chiefs.
+- API keys live in the macOS Keychain, reachable only via the signed `jointchiefs-keygetter` binary. Env vars exist as a CI fallback.
 - No telemetry. No analytics. The only network traffic is to the LLM APIs you've configured.
+- The MCP server is **stdio-only** — nothing binds a port.
 - Code sent for review is stored only in local transcript files. Delete them whenever.
 
 ## Development
 
 ```bash
 cd JointChiefs
-swift test          # 41 tests
+swift test          # 60 tests
 swift build -c release
 ```
 
@@ -151,9 +192,13 @@ The project layout:
 
 ```
 JointChiefs/
+├── Package.swift
 ├── Sources/
-│   ├── JointChiefsCore/    # Models, providers, orchestrator
-│   └── JointChiefsCLI/     # `jointchiefs` executable
+│   ├── JointChiefsCore/        # Models, providers, orchestrator, APIKeyResolver
+│   ├── JointChiefsCLI/         # jointchiefs executable
+│   ├── JointChiefsMCP/         # jointchiefs-mcp stdio server
+│   ├── JointChiefsSetup/       # jointchiefs-setup SwiftUI installer
+│   └── JointChiefsKeygetter/   # jointchiefs-keygetter — sole Keychain identity
 └── Tests/JointChiefsCoreTests/
 ```
 

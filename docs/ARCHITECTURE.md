@@ -1,7 +1,10 @@
 # Joint Chiefs — Architecture
 
-**Version:** 1.3
-**Last Updated:** 2026-04-19
+**Version:** 1.4
+**Last Updated:** 2026-04-20
+
+**Website:** [jointchiefs.ai](https://jointchiefs.ai/) — deployed via Netlify. Source in the private `djfunboy/joint-chiefs-website` repo.
+**App repo:** [github.com/djfunboy/joint-chiefs](https://github.com/djfunboy/joint-chiefs) (public, MIT).
 
 ## System Overview
 
@@ -386,6 +389,13 @@ Claude model for per-round reviews and a larger one for the final call.
 - **Swift Package Manager** for dependencies
 - **Dependencies:** Hummingbird, Swift ArgumentParser, SwiftData (system)
 
+## Distribution
+
+- **App repo:** public at [github.com/djfunboy/joint-chiefs](https://github.com/djfunboy/joint-chiefs) — MIT licensed.
+- **Website:** [jointchiefs.ai](https://jointchiefs.ai/) — static HTML + shared `styles.css`, Agentdeck palette matching the setup app. Hosted on Netlify (site ID `79794bf5-ed42-41bb-9610-a6cd57a79a12`); source is a separate private repo (`djfunboy/joint-chiefs-website`). Netlify manages the apex domain + `www` alias + Let's Encrypt cert.
+- **Release artifact** (pending): notarized DMG containing `Joint Chiefs.app`. The Sparkle appcast feed lives at `jointchiefs.ai/appcast.xml` (placeholder until first notarized release).
+- **Auto-update path:** Sparkle for the app bundle. No custom updater for the CLI or MCP binaries — a fresh `brew install` (once the tap is live) or a re-run of the setup app picks up new versions.
+
 ## Revision History
 
 | Version | Date | Changes |
@@ -394,3 +404,4 @@ Claude model for per-round reviews and a larger one for the final call.
 | 1.1 | 2026-04-09 | Reflect current state: hub-and-spoke debate with Claude as moderator, SSE streaming via `URLSession.bytes`, HTTP server deferred, project structure trimmed to what actually exists, environment-variable configuration documented, 5 providers including Anthropic. |
 | 1.2 | 2026-04-18 | v2 scope: added `jointchiefs-mcp` stdio server target, `jointchiefs-keygetter` as sole Keychain identity, `APIKeyResolver` as the env/keygetter funnel, `StrategyConfig` + `StrategyConfigStore` for moderator/consensus/rounds persistence. Removed the stale local-HTTP-server section. Security model updated for lean-baseline direction (Developer ID + notarization + Sparkle, no XPC, no custom updater). |
 | 1.3 | 2026-04-19 | Added the `JointChiefsSetup` SwiftUI target (`jointchiefs-setup`) with Disclosure / Keys / Roles-&-Weights / Install / MCP-Config sections; the setup app goes through `APIKeyResolver.writeViaKeygetter` / `deleteViaKeygetter` rather than linking Keychain directly. Documented `StrategyConfig.providerWeights` and the weighted-voting path in `DebateOrchestrator.applyConsensusMode`. `ReviewProvider` now exposes `providerType` so the orchestrator can map a provider instance to its configured weight. |
+| 1.4 | 2026-04-20 | Added website + repository references to the header, plus a new Distribution section documenting the Netlify deployment of jointchiefs.ai (site id, domain aliases, Sparkle appcast location). Corrected the auto-update description to match the lean baseline — Sparkle for the app bundle only, no custom updater for CLI/MCP binaries. |

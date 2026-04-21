@@ -1,7 +1,10 @@
 # Joint Chiefs — Value Proposition
 
-**Version:** 2.0
-**Last Updated:** 2026-04-16
+**Version:** 2.1
+**Last Updated:** 2026-04-20
+
+**Website:** [jointchiefs.ai](https://jointchiefs.ai/) (live)
+**Repo:** [github.com/djfunboy/joint-chiefs](https://github.com/djfunboy/joint-chiefs) (public, MIT)
 
 ## Core Value Proposition
 
@@ -43,7 +46,7 @@ You care about *how* the models arrive at a conclusion. Full transcripts are wri
 2. **"Built for MCP first."** Discover it in your AI client's tool list. Invoke it like any other tool. The host LLM never touches the API keys; the server holds them.
 3. **"Setup takes one click, not one afternoon."** The macOS app installs the binaries, validates every API key, and emits a copy-paste MCP config snippet. The CLI is there when you want to script it.
 4. **"Research-backed."** Adaptive break, tit-for-tat engagement, judge arbitration — straight from the MAD literature. We cite the paper because it matters.
-5. **"Updates itself."** Sparkle for the app, custom EdDSA-signed updater for the CLI and MCP server. You get fixes the day they ship, even if you never open the GUI.
+5. **"Updates itself."** Sparkle for the app bundle — the setup app auto-updates and re-installs the bundled CLI + MCP binaries from `Contents/Resources/`. No custom updater, no surprise background processes.
 
 ## The Three Surfaces
 
@@ -70,7 +73,7 @@ The app is not required to use the product. The CLI is not required to use the M
 | Streaming SSE on every provider | Tokens appear live in the CLI; the orchestrator can tell "slow" from "dead" |
 | Local transcripts | Full debate written to disk — replay, audit, or pipe into your own tooling |
 | One-click setup app | API key validation with live test buttons, copy-paste MCP config snippet |
-| Auto-update everywhere | Sparkle for the app; EdDSA-signed updater for the CLI/MCP — works without ever launching the GUI |
+| Auto-update | Sparkle for the app bundle; a re-install picks up new CLI + MCP binaries |
 | Privacy-first | API keys stay local; no telemetry; the only network traffic is to providers you configured |
 
 ## Competitive Positioning
@@ -127,7 +130,7 @@ Joint Chiefs is an MCP server that runs your code past OpenAI, Gemini, Grok, and
 - **Structured debate, not majority vote** — built on MAD protocol research
 - **Drops into your AI client** — MCP server, works with any MCP-aware host
 - **One-click setup** — macOS app installs everything, validates every key
-- **Auto-updates** — Sparkle for the app, EdDSA-signed updater for the binaries
+- **Auto-updates** — Sparkle for the app bundle (re-installs bundled CLI + MCP binaries)
 - **Local-only** — no telemetry, no servers, your code never leaves your machine except to the providers you chose
 
 ## Brand Voice
@@ -144,3 +147,4 @@ Joint Chiefs is an MCP server that runs your code past OpenAI, Gemini, Grok, and
 |---|---|---|
 | 1.0 | 2026-04-08 | Initial value proposition (CLI-only product) |
 | 2.0 | 2026-04-16 | Reframed for v2 launch under jointchiefs.ai. Lead with MCP server framing. Documented three-surface product (MCP / CLI / setup app). Sharpened MAD-vs-vote-based-consensus pitch with explicit research citation. Updated competitive table for 2026 ecosystem (Zen MCP, Second Opinion variants, mcp-sage, pal-mcp-server, multi_mcp). Dropped deferred menu bar app. Added website-ready material: tagline, headline candidates, CTA copy, key benefit bullets. |
+| 2.1 | 2026-04-20 | Website + repo links added to header. Corrected the "updates itself" messaging across Key Messages, Feature Benefits, and key-benefit bullets — aligned with the lean-baseline direction (Sparkle for the app bundle only; no custom EdDSA-signed updater for the CLI/MCP binaries). |

@@ -1,6 +1,6 @@
 # Joint Chiefs — Design System
 
-**Version:** 1.0
+**Version:** 1.1
 **Last Updated:** 2026-04-20
 **Source of truth:** [Agentdeck design system](https://ui-engine-gallery.netlify.app/agentdeck/design-system)
 **Companion:** [`../../Joint Chiefs Website/docs/DESIGN-SYSTEM.md`](../../Joint%20Chiefs%20Website/docs/DESIGN-SYSTEM.md) — same tokens, CSS implementation
@@ -192,9 +192,17 @@ All buttons use `Font.agentSmall` and monospace except where explicitly stated.
 - Padding: 10pt vertical, 12pt horizontal
 - Focus: swap border to **dashed** `agentTextAccent.opacity(0.8)` 1pt — matches Agentdeck's warm-tan dashed focus
 - Font: `Font.agentBody` (mono 13pt)
-- Placeholder: `agentTextMuted`
+- Placeholder: system default (the spec calls for `agentTextMuted`, but SwiftUI doesn't expose placeholder color on plain `TextField` without a custom overlay — tracked in `KNOWN-ISSUES.md`).
 
-Use a `ViewModifier` called `AgentInputStyle` to apply consistently.
+Implemented as `AgentInputStyle` in `AgentdeckComponents.swift`. The caller owns `@FocusState` and passes `isFocused` through:
+
+```swift
+@FocusState private var isFocused: Bool
+
+TextField("Paste API key", text: $draft)
+    .focused($isFocused)
+    .agentInputStyle(focused: isFocused)
+```
 
 ### Pills / Badges
 
@@ -204,8 +212,14 @@ Use a `ViewModifier` called `AgentInputStyle` to apply consistently.
 | Info | `agentInfo.opacity(0.2)` | `agentInfo` | same |
 | Warning | `agentWarning.opacity(0.2)` | `agentWarning` | same |
 | Error | `agentError.opacity(0.12)` | `agentError` | same |
-| NEW | `agentTextAccent.opacity(0.25)` | `agentTextAccent` | mono 10pt UPPER, 0.06em tracking, 4pt radius, 2×6 padding |
+| Accent (NEW badge) | `agentTextAccent.opacity(0.25)` | `agentTextAccent` | same |
 | Neutral | `agentBgPanel` | `agentTextBody` | mono 12pt / 400 |
+
+Implemented as `AgentPill` in `AgentdeckComponents.swift`:
+
+```swift
+AgentPill(text: "saved", kind: .success, icon: "lock.fill")
+```
 
 ### Chips (Chat input style)
 
@@ -214,6 +228,38 @@ Used for model picker, speed, reasoning effort, mode, etc.
 - **Idle:** 1px `agentBorderMuted` border, `.clear` background, `agentTextPrimary` fg, mono 12pt/500
 - **Active:** 1px `agentTextAccent` border, `agentBgUncommitted` (`#3a2e2a`) background
 - 4pt radius, 6/10 padding
+
+Implemented as `AgentChip` in `AgentdeckComponents.swift`:
+
+```swift
+AgentChip(
+    label: "Claude",
+    isActive: model.strategy.moderator == .claude,
+    action: { model.setModerator(.claude) }
+)
+```
+
+### Panel surface
+
+Replaces native `GroupBox` in warm-dark contexts. `agentBgPanel` fill, 1pt `agentBorder` outline, 8pt radius. The tinted variant takes a color for workflow tints (`agentBgUncommitted` for dirty, `agentBgReady` for success).
+
+Implemented as View modifiers in `AgentdeckComponents.swift`:
+
+```swift
+VStack { ... }.agentPanel()
+
+VStack { ... }.agentPanel(tint: .agentBgReady)
+```
+
+### Section header
+
+Uppercase mono 12pt/600 with 0.05em tracking, `agentTextAccent` warm-tan color. Used for panel eyebrow labels.
+
+Implemented as `AgentSectionHeader` in `AgentdeckComponents.swift`:
+
+```swift
+AgentSectionHeader(text: "Moderator")
+```
 
 ### Status Dots
 

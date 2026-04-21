@@ -1,7 +1,10 @@
 # Joint Chiefs — Product Requirements Document
 
-**Version:** 1.2
-**Last Updated:** 2026-04-19
+**Version:** 1.3
+**Last Updated:** 2026-04-20
+
+**Website:** [jointchiefs.ai](https://jointchiefs.ai/) (live)
+**Repository:** [github.com/djfunboy/joint-chiefs](https://github.com/djfunboy/joint-chiefs) (public, MIT)
 
 ## Product Overview
 
@@ -71,7 +74,7 @@ CLI tool installed at `/opt/homebrew/bin/jointchiefs` (Apple Silicon Macs only).
 ### F5: macOS Menu Bar App — DEFERRED
 CLI-only works fine for solo use. Revisit if a GUI becomes necessary.
 
-### F6: Setup App — DONE (scaffold)
+### F6: Setup App — DONE (scaffold + design-system migration)
 Single-window SwiftUI executable (`jointchiefs-setup`) that ships alongside
 the CLI and MCP server. Five sections:
 - [x] Data-handling disclosure (first-run)
@@ -79,6 +82,7 @@ the CLI and MCP server. Five sections:
 - [x] Roles & Weights screen — moderator, tiebreaker, consensus mode, per-provider weight sliders (0 = excluded), rounds & timeout sliders, voting threshold slider
 - [x] Install screen — Homebrew/`~/.local/bin`/custom destination, PATH detection, copies the three binaries
 - [x] MCP config snippet — keyless JSON, Copy button
+- [x] All five views migrated to Agentdeck design tokens (no hex/CGFloat literals in any view); new design-system components: `AgentInputStyle`, `agentPanel`, `AgentPill`, `AgentChip`, `AgentSectionHeader`
 - [ ] Bundled in `Joint Chiefs.app` with `Contents/Resources/` binaries (tracked in Phase 10)
 - [ ] VoiceOver + Dynamic Type pass (tracked in Phase 9)
 
@@ -164,3 +168,4 @@ Local transcript files written to disk. A UI for browsing them is deferred with 
 | 1.0 | 2026-04-08 | Initial PRD |
 | 1.1 | 2026-04-09 | Updated F1-F8 status (F1-F4 DONE, F5-F7 DEFERRED, F8 PARTIAL); rewrote Flow 1 to reflect CLI build/install process; rewrote Flow 2 to show streaming output; dropped Flow 3 (menu bar app deferred) |
 | 1.2 | 2026-04-19 | F6 (Setup App) promoted from DEFERRED to DONE (scaffold) — `jointchiefs-setup` ships Disclosure/Keys/Roles-&-Weights/Install/MCP-Config sections; per-provider weighting (0 excludes, >1 amplifies voting weight) landed in `StrategyConfig`. Bundle wrapping + accessibility pass remain tracked in Phases 9 and 10. |
+| 1.3 | 2026-04-20 | Added website + repository references to the header. F6 updated to reflect the Agentdeck design-system migration landing across all five views — `AgentInputStyle`, `agentPanel`, `AgentPill`, `AgentChip`, `AgentSectionHeader` shipped as reusable components in `JointChiefsSetup/DesignSystem/AgentdeckComponents.swift`. |
