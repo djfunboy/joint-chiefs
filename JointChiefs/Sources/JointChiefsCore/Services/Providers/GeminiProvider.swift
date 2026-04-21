@@ -7,6 +7,7 @@ public struct GeminiProvider: ReviewProvider {
 
     public let name: String
     public let model: String
+    public let providerType: ProviderType = .gemini
     private let endpoint: URL
     private let apiKey: String
     private let urlSession: URLSession

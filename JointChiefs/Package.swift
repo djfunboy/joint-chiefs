@@ -9,7 +9,8 @@ let package = Package(
         .library(name: "JointChiefsCore", targets: ["JointChiefsCore"]),
         .executable(name: "jointchiefs", targets: ["JointChiefsCLI"]),
         .executable(name: "jointchiefs-mcp", targets: ["JointChiefsMCP"]),
-        .executable(name: "jointchiefs-keygetter", targets: ["JointChiefsKeygetter"])
+        .executable(name: "jointchiefs-keygetter", targets: ["JointChiefsKeygetter"]),
+        .executable(name: "jointchiefs-setup", targets: ["JointChiefsSetup"])
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
@@ -40,6 +41,11 @@ let package = Package(
             name: "JointChiefsKeygetter",
             dependencies: ["JointChiefsCore"],
             path: "Sources/JointChiefsKeygetter"
+        ),
+        .executableTarget(
+            name: "JointChiefsSetup",
+            dependencies: ["JointChiefsCore"],
+            path: "Sources/JointChiefsSetup"
         ),
         .testTarget(
             name: "JointChiefsCoreTests",

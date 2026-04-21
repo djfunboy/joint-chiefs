@@ -7,6 +7,7 @@ public struct OllamaProvider: ReviewProvider {
 
     public let name: String
     public let model: String
+    public let providerType: ProviderType = .ollama
     private let endpoint: URL
     private let urlSession: URLSession
 

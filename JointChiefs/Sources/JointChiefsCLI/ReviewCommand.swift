@@ -39,7 +39,11 @@ struct Review: AsyncParsableCommand {
 
     func run() async throws {
         let code = try readCode()
-        let providers = buildProviders()
+        let strategyForPanel = StrategyConfigStore.load()
+        let providers = buildProviders(
+            weights: strategyForPanel.providerWeights,
+            ollama: strategyForPanel.ollama
+        )
 
         guard !providers.isEmpty else {
             stderr("No API keys found. Configure at least one provider:")
@@ -49,7 +53,7 @@ struct Review: AsyncParsableCommand {
             throw ExitCode.failure
         }
 
-        var strategy = StrategyConfigStore.load()
+        var strategy = strategyForPanel
         if let rounds { strategy.maxRounds = rounds }
         if let timeout { strategy.timeoutSeconds = timeout }
 
@@ -260,8 +264,8 @@ struct Review: AsyncParsableCommand {
 
     // MARK: - Provider Setup
 
-    private func buildProviders() -> [any ReviewProvider] {
-        ProviderFactory.buildPanel(resolveKey: self.resolveKey)
+    private func buildProviders(weights: [ProviderType: Double], ollama: OllamaConfig) -> [any ReviewProvider] {
+        ProviderFactory.buildPanel(resolveKey: self.resolveKey, weights: weights, ollama: ollama)
     }
 
     /// Env var → keygetter → nil. Surfaces keygetter errors to the user; silent

@@ -16,8 +16,9 @@ Multi-model AI code review orchestrator. CLI tool that sends code to multiple LL
 - **Swift strict typing.** No `Any` unless truly unavoidable.
 - **@Observable macro.** macOS 15+ target. Use `@State`, `@Environment`, `@Bindable`. Never mix with `ObservableObject`.
 - **@MainActor** on all classes that publish UI state.
-- **Service pattern:** `@Environment` injection (no singletons). Same pattern as Degree Daddy.
+- **Service pattern:** `@Environment` injection (no singletons). Same pattern used across our other macOS apps.
 - **Build system:** Swift Package Manager. Minimum target macOS 15.0 (Sonoma). **Apple Silicon only** — Intel Macs are not supported.
+- **Design system:** Agentdeck (monospace-as-identity, warm-charcoal palette). See `docs/DESIGN-SYSTEM.md`. Every Color, Font, spacing, and radius used in `JointChiefsSetup` must come from the `Agentdeck*` token files in `Sources/JointChiefsSetup/DesignSystem/`. Never hardcode a hex or a CGFloat in a view.
 
 ## Tech Stack
 
@@ -75,5 +76,6 @@ Joint Chiefs/
 - `docs/BUILD-PLAN.md` — Phased implementation plan with checkpoint statuses
 - `docs/PRD.md` — Product requirements, features, acceptance criteria
 - `docs/DATA-MODEL.md` — Type definitions, transcript schema
+- `docs/DESIGN-SYSTEM.md` — Agentdeck tokens + SwiftUI component mappings (mandatory reading before any UI change)
 - `docs/KNOWN-ISSUES.md` — Active bugs, tech debt, documentation gaps
 - `tasks/lessons.md` — Corrections and patterns (reviewed every session)

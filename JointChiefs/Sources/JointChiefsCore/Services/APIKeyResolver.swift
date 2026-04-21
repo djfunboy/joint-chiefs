@@ -38,6 +38,30 @@ public enum APIKeyResolver {
         return try invoke(path: keygetterPath, arguments: ["read", account])
     }
 
+    /// Write a key via the keygetter. Used by the setup app so the Keychain ACL
+    /// stays bound to the single keygetter identity rather than each surface that
+    /// writes a key.
+    public static func writeViaKeygetter(account: String, key: String) throws {
+        guard let keygetterPath = locateKeygetter() else {
+            throw APIKeyResolverError.keygetterFailed(
+                exitCode: -1,
+                stderr: "keygetter binary not found"
+            )
+        }
+        _ = try invoke(path: keygetterPath, arguments: ["write", account, key])
+    }
+
+    /// Delete a key via the keygetter.
+    public static func deleteViaKeygetter(account: String) throws {
+        guard let keygetterPath = locateKeygetter() else {
+            throw APIKeyResolverError.keygetterFailed(
+                exitCode: -1,
+                stderr: "keygetter binary not found"
+            )
+        }
+        _ = try invoke(path: keygetterPath, arguments: ["delete", account])
+    }
+
     // MARK: - Keygetter Discovery
 
     /// First match wins:
@@ -62,9 +86,19 @@ public enum APIKeyResolver {
 
     private static func defaultSearchPaths() -> [String] {
         var paths: [String] = []
+        // 1. Sibling of the running executable. Works for CLI + MCP in any
+        //    install directory (jointchiefs and jointchiefs-keygetter land together).
         if let sibling = siblingPath(for: "jointchiefs-keygetter") {
             paths.append(sibling)
         }
+        // 2. `../Resources/` relative to the running executable. The setup app
+        //    runs from `Joint Chiefs.app/Contents/MacOS/jointchiefs-setup` while
+        //    its sibling CLIs live in `Contents/Resources/` — standard bundle
+        //    layout, not the `MacOS/` directory, so a flat sibling lookup misses.
+        if let resourcesRelative = resourcesSiblingPath(for: "jointchiefs-keygetter") {
+            paths.append(resourcesRelative)
+        }
+        // 3. Default install location for /Applications bundles.
         paths.append("/Applications/Joint Chiefs.app/Contents/Resources/jointchiefs-keygetter")
         return paths
     }
@@ -73,6 +107,17 @@ public enum APIKeyResolver {
         let executablePath = CommandLine.arguments.first ?? ""
         let resolved = URL(fileURLWithPath: executablePath).resolvingSymlinksInPath()
         return resolved.deletingLastPathComponent().appendingPathComponent(name).path
+    }
+
+    private static func resourcesSiblingPath(for name: String) -> String? {
+        let executablePath = CommandLine.arguments.first ?? ""
+        let resolved = URL(fileURLWithPath: executablePath).resolvingSymlinksInPath()
+        return resolved
+            .deletingLastPathComponent()          // drop exe name
+            .deletingLastPathComponent()          // drop MacOS/
+            .appendingPathComponent("Resources", isDirectory: true)
+            .appendingPathComponent(name)
+            .path
     }
 
     /// Spawn the keygetter, capture stdout, and return the trimmed key.

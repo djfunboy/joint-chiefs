@@ -279,4 +279,93 @@ struct OrchestratorTests {
         let titles = summary.findings.map(\.title)
         #expect(titles.contains("Race condition"))
     }
+
+    // MARK: - Provider Weighting
+
+    @Test("votingThreshold respects per-provider weights: a heavy provider alone can clear the bar")
+    func votingThresholdUsesProviderWeights() async throws {
+        // 3 providers, total weight 4.0 (one provider has weight 2.0).
+        // Threshold 0.5 = finding needs ≥ 2.0 in weighted support to survive.
+        //   "Heavy only":  raised by OpenAI (weight 2.0) → 2.0 / 4.0 = 0.50 → kept
+        //   "Light only":  raised by Gemini (weight 1.0) → 1.0 / 4.0 = 0.25 → dropped
+        let heavyOnly = Self.finding("SQL injection", .high)
+        let lightOnly = Self.finding("Memory leak", .medium)
+
+        let heavy = MockProvider(
+            name: "Heavy",
+            providerType: .openAI,
+            reviewFindings: [heavyOnly]
+        )
+        let lightA = MockProvider(
+            name: "LightA",
+            providerType: .gemini,
+            reviewFindings: [lightOnly]
+        )
+        let lightB = MockProvider(
+            name: "LightB",
+            providerType: .grok,
+            reviewFindings: []
+        )
+
+        let strategy = StrategyConfig(
+            consensus: .votingThreshold,
+            maxRounds: 1,
+            thresholdPercent: 0.5,
+            providerWeights: [.openAI: 2.0, .gemini: 1.0, .grok: 1.0]
+        )
+        let orchestrator = DebateOrchestrator(
+            providers: [heavy, lightA, lightB],
+            moderator: nil,
+            strategy: strategy
+        )
+        let (summary, _) = try await orchestrator.runReview(context: sampleContext)
+
+        let titles = summary.findings.map(\.title)
+        #expect(titles.contains("SQL injection"))
+        #expect(!titles.contains("Memory leak"))
+    }
+
+    @Test("buildPanel filters out providers with weight 0")
+    func buildPanelExcludesZeroWeightedProviders() {
+        let env: [String: String] = [:]
+        let resolveAny: (ProviderType) -> String? = { _ in "test-key" }
+
+        let weights: [ProviderType: Double] = [
+            .openAI: 1.0,
+            .gemini: 0.0,   // excluded
+            .grok: 1.5,
+            .anthropic: 0.0 // excluded
+        ]
+        let providers = ProviderFactory.buildPanel(
+            resolveKey: resolveAny,
+            weights: weights,
+            env: env
+        )
+        let types = providers.map(\.providerType)
+        #expect(types.contains(.openAI))
+        #expect(types.contains(.grok))
+        #expect(!types.contains(.gemini))
+        #expect(!types.contains(.anthropic))
+    }
+
+    @Test("StrategyConfig round-trips providerWeights through JSON")
+    func strategyConfigEncodesProviderWeightsAsObject() throws {
+        let original = StrategyConfig(
+            providerWeights: [.openAI: 1.5, .gemini: 0.0, .anthropic: 2.0]
+        )
+        let data = try JSONEncoder().encode(original)
+        // Sanity: the on-disk form should be a readable object, not a Swift-style
+        // flat array of alternating keys and values.
+        let json = String(data: data, encoding: .utf8) ?? ""
+        #expect(json.contains("\"openAI\""))
+        #expect(json.contains("\"gemini\""))
+
+        let decoded = try JSONDecoder().decode(StrategyConfig.self, from: data)
+        #expect(decoded.providerWeights[.openAI] == 1.5)
+        #expect(decoded.providerWeights[.gemini] == 0.0)
+        #expect(decoded.providerWeights[.anthropic] == 2.0)
+        #expect(decoded.isExcluded(.gemini))
+        #expect(!decoded.isExcluded(.openAI))
+        #expect(decoded.weight(for: .grok) == 1.0) // missing → defaults to 1.0
+    }
 }

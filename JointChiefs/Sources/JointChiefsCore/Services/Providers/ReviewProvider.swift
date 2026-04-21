@@ -8,6 +8,10 @@ public protocol ReviewProvider: Sendable {
     /// The specific model identifier used by this provider (e.g., "gpt-5.4", "gemini-3.1-pro-preview").
     var model: String { get }
 
+    /// The underlying provider type. Used by the orchestrator to look up per-provider
+    /// weight in `StrategyConfig.providerWeights`.
+    var providerType: ProviderType { get }
+
     /// Performs an initial code review.
     ///
     /// - Parameters:

@@ -3,9 +3,8 @@ import JointChiefsCore
 import MCP
 
 // The Joint Chiefs MCP server exposes a single tool, `joint_chiefs_review`, over stdio.
-// Spawned by AI clients (Claude Code, Claude Desktop, Cursor, etc.) via JSON-RPC over
-// stdin/stdout. Trust is inherited from the parent process — the MCP client owns our
-// stdio by definition. See docs/SECURITY.md.
+// Spawned by any MCP client via JSON-RPC over stdin/stdout. Trust is inherited from the
+// parent process — the MCP client owns our stdio by definition. See docs/SECURITY.md.
 //
 // Stdio-only invariant: network transports (HTTP, SSE, WebSocket) are architecturally
 // prohibited. Every security assumption in this server depends on stdio-only.

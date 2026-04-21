@@ -36,6 +36,30 @@ public struct StrategyConfig: Codable, Sendable, Equatable {
     /// `consensus == .votingThreshold`. Ignored for other modes. Range: 0.0–1.0.
     public var thresholdPercent: Double
 
+    // MARK: - Per-Provider Weighting
+
+    /// Per-provider weight used in two places:
+    ///
+    /// 1. **Panel inclusion.** A weight of `0.0` excludes the provider from the spoke
+    ///    panel entirely — `ProviderFactory.buildPanel` skips it even if an API key is
+    ///    available. Any other value (including missing entries) includes the provider.
+    /// 2. **Voting-threshold math.** In `ConsensusMode.votingThreshold`, the survival
+    ///    ratio is `sum(weights of providers who raised a finding) / sum(weights of
+    ///    all providers that responded in the final round)`. Equal weights reduce
+    ///    to the pre-weighting raw-count ratio.
+    ///
+    /// Missing entries default to `1.0`. Setting this to an empty dictionary yields
+    /// the v1 behavior.
+    public var providerWeights: [ProviderType: Double]
+
+    // MARK: - Local Models (Ollama)
+
+    /// Configuration for the optional local Ollama general. When disabled, Ollama
+    /// is skipped even if the server is reachable. The `OLLAMA_ENABLED` env var
+    /// remains a CI override: set to `1` to force-include or `0` to force-exclude,
+    /// regardless of this setting.
+    public var ollama: OllamaConfig
+
     // MARK: - Rate Limiting (MCP server only)
 
     /// Rate limits applied in the MCP server context, to defend against stuck
@@ -51,6 +75,8 @@ public struct StrategyConfig: Codable, Sendable, Equatable {
         maxRounds: 5,
         timeoutSeconds: 120,
         thresholdPercent: 0.66,
+        providerWeights: [:],
+        ollama: .default,
         rateLimits: .default
     )
 
@@ -61,6 +87,8 @@ public struct StrategyConfig: Codable, Sendable, Equatable {
         maxRounds: Int = 5,
         timeoutSeconds: Int = 120,
         thresholdPercent: Double = 0.66,
+        providerWeights: [ProviderType: Double] = [:],
+        ollama: OllamaConfig = .default,
         rateLimits: RateLimits = .default
     ) {
         self.moderator = moderator
@@ -69,18 +97,31 @@ public struct StrategyConfig: Codable, Sendable, Equatable {
         self.maxRounds = maxRounds
         self.timeoutSeconds = timeoutSeconds
         self.thresholdPercent = thresholdPercent
+        self.providerWeights = providerWeights
+        self.ollama = ollama
         self.rateLimits = rateLimits
+    }
+
+    /// Returns the configured weight for a provider, falling back to `1.0` when
+    /// no explicit entry is set. A weight of `0.0` signals "exclude from panel."
+    public func weight(for provider: ProviderType) -> Double {
+        providerWeights[provider] ?? 1.0
+    }
+
+    /// True when the provider should be dropped from the panel entirely.
+    public func isExcluded(_ provider: ProviderType) -> Bool {
+        weight(for: provider) <= 0
     }
 }
 
 // MARK: - Codable migration
 
 extension StrategyConfig {
-    // Older strategy.json files (written before thresholdPercent was added) omit
-    // the field. Supply the default so old configs still decode cleanly.
+    // Older strategy.json files omit fields added in later revisions. Supply
+    // defaults so old configs still decode cleanly.
     private enum CodingKeys: String, CodingKey {
         case moderator, tiebreaker, consensus, maxRounds, timeoutSeconds
-        case thresholdPercent, rateLimits
+        case thresholdPercent, providerWeights, ollama, rateLimits
     }
 
     public init(from decoder: Decoder) throws {
@@ -91,7 +132,61 @@ extension StrategyConfig {
         self.maxRounds = try c.decode(Int.self, forKey: .maxRounds)
         self.timeoutSeconds = try c.decode(Int.self, forKey: .timeoutSeconds)
         self.thresholdPercent = try c.decodeIfPresent(Double.self, forKey: .thresholdPercent) ?? 0.66
+        // providerWeights round-trips as { "openAI": 1.0, "gemini": 0.0, ... } for
+        // human readability. Swift's default synthesized Codable encodes enum-keyed
+        // dictionaries as flat arrays, which is unreadable in strategy.json.
+        let rawWeights = try c.decodeIfPresent([String: Double].self, forKey: .providerWeights) ?? [:]
+        var weights: [ProviderType: Double] = [:]
+        for (rawKey, value) in rawWeights {
+            if let type = ProviderType(rawValue: rawKey) {
+                weights[type] = value
+            }
+        }
+        self.providerWeights = weights
+        self.ollama = try c.decodeIfPresent(OllamaConfig.self, forKey: .ollama) ?? .default
         self.rateLimits = try c.decode(RateLimits.self, forKey: .rateLimits)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(moderator, forKey: .moderator)
+        try c.encode(tiebreaker, forKey: .tiebreaker)
+        try c.encode(consensus, forKey: .consensus)
+        try c.encode(maxRounds, forKey: .maxRounds)
+        try c.encode(timeoutSeconds, forKey: .timeoutSeconds)
+        try c.encode(thresholdPercent, forKey: .thresholdPercent)
+        // Map to [String: Double] so the on-disk form is a JSON object, not an array.
+        var rawWeights: [String: Double] = [:]
+        for (type, value) in providerWeights {
+            rawWeights[type.rawValue] = value
+        }
+        try c.encode(rawWeights, forKey: .providerWeights)
+        try c.encode(ollama, forKey: .ollama)
+        try c.encode(rateLimits, forKey: .rateLimits)
+    }
+}
+
+// MARK: - OllamaConfig
+
+public struct OllamaConfig: Codable, Sendable, Equatable {
+    /// Whether to include Ollama as a spoke in the debate panel.
+    public var enabled: Bool
+    /// Model identifier to request from Ollama (e.g. `"llama3"`, `"mistral"`, `"qwen2.5-coder"`).
+    public var model: String
+    /// Base URL for the Ollama server. Defaults to `http://localhost:11434`; set
+    /// to a LAN address to point at a shared Ollama host.
+    public var endpoint: String
+
+    public static let `default` = OllamaConfig(
+        enabled: false,
+        model: "llama3",
+        endpoint: "http://localhost:11434"
+    )
+
+    public init(enabled: Bool = false, model: String = "llama3", endpoint: String = "http://localhost:11434") {
+        self.enabled = enabled
+        self.model = model
+        self.endpoint = endpoint
     }
 }
 

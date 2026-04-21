@@ -13,42 +13,80 @@ public enum ProviderFactory {
     // MARK: - Panel Assembly
 
     /// Build the spoke panel — every provider with a resolvable key, plus Ollama when
-    /// `OLLAMA_ENABLED=1`. Preserves the ordering used by the pre-refactor callers
-    /// (OpenAI, Gemini, Grok, Anthropic, Ollama) so existing tests remain stable.
+    /// explicitly enabled via `StrategyConfig.ollama` or the `OLLAMA_ENABLED` env var.
+    /// Preserves the ordering used by the pre-refactor callers (OpenAI, Gemini, Grok,
+    /// Anthropic, Ollama) so existing tests remain stable.
+    ///
+    /// - Parameters:
+    ///   - resolveKey: Closure that returns the API key for a provider, or nil.
+    ///   - weights: Optional per-provider weights. A weight of `0.0` (or any
+    ///     non-positive value) excludes the provider from the panel regardless of key
+    ///     availability. Nil means "no weighting applied" (v1 behavior).
+    ///   - ollama: Optional Ollama configuration (enabled/model/endpoint). When set,
+    ///     overrides the `OLLAMA_ENABLED` / `OLLAMA_MODEL` env-var path; the env vars
+    ///     still win if *explicitly* set in the environment, as a CI override.
+    ///   - env: Process environment, injectable for tests.
     public static func buildPanel(
         resolveKey: (ProviderType) -> String?,
+        weights: [ProviderType: Double]? = nil,
+        ollama: OllamaConfig? = nil,
         env: [String: String] = ProcessInfo.processInfo.environment
     ) -> [any ReviewProvider] {
         var providers: [any ReviewProvider] = []
 
-        if let key = resolveKey(.openAI) {
+        func isExcluded(_ type: ProviderType) -> Bool {
+            guard let weights else { return false }
+            guard let weight = weights[type] else { return false }
+            return weight <= 0
+        }
+
+        if !isExcluded(.openAI), let key = resolveKey(.openAI) {
             providers.append(OpenAIProvider(
                 apiKey: key,
                 model: env["OPENAI_MODEL"] ?? ProviderType.openAI.defaultModel
             ))
         }
-        if let key = resolveKey(.gemini) {
+        if !isExcluded(.gemini), let key = resolveKey(.gemini) {
             providers.append(GeminiProvider(
                 apiKey: key,
                 model: env["GEMINI_MODEL"] ?? ProviderType.gemini.defaultModel
             ))
         }
-        if let key = resolveKey(.grok) {
+        if !isExcluded(.grok), let key = resolveKey(.grok) {
             providers.append(GrokProvider(
                 apiKey: key,
                 model: env["GROK_MODEL"] ?? ProviderType.grok.defaultModel
             ))
         }
-        if let key = resolveKey(.anthropic) {
+        if !isExcluded(.anthropic), let key = resolveKey(.anthropic) {
             providers.append(AnthropicProvider(
                 apiKey: key,
                 model: env["ANTHROPIC_MODEL"] ?? ProviderType.anthropic.defaultModel
             ))
         }
-        if env["OLLAMA_ENABLED"] == "1" {
-            providers.append(OllamaProvider(
-                model: env["OLLAMA_MODEL"] ?? ProviderType.ollama.defaultModel
-            ))
+
+        // Ollama resolution priority:
+        //   1. OLLAMA_ENABLED env var set explicitly to "1" → include; "0" → exclude.
+        //      (CI override — mirrors the API-key env-var-first pattern.)
+        //   2. Otherwise, use `ollama.enabled` from StrategyConfig.
+        //   3. If neither path enables Ollama, skip it.
+        //
+        // Model/endpoint resolution follows the same layering: env var first, then
+        // the StrategyConfig, then hardcoded defaults.
+        let ollamaEnabled: Bool = {
+            if let envFlag = env["OLLAMA_ENABLED"] {
+                return envFlag == "1"
+            }
+            return ollama?.enabled ?? false
+        }()
+        if !isExcluded(.ollama), ollamaEnabled {
+            let model = env["OLLAMA_MODEL"] ?? ollama?.model ?? ProviderType.ollama.defaultModel
+            let endpointString = ollama?.endpoint ?? "http://localhost:11434"
+            if let url = URL(string: endpointString) {
+                providers.append(OllamaProvider(model: model, endpoint: url))
+            } else {
+                providers.append(OllamaProvider(model: model))
+            }
         }
 
         return providers

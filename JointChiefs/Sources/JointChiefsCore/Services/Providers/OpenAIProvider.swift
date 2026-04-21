@@ -7,6 +7,7 @@ public struct OpenAIProvider: ReviewProvider {
 
     public let name: String
     public let model: String
+    public let providerType: ProviderType = .openAI
     private let endpoint: URL
     private let apiKey: String
     private let urlSession: URLSession

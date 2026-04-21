@@ -5,6 +5,7 @@ import Foundation
 struct MockProvider: ReviewProvider, Sendable {
     let name: String
     let model: String
+    let providerType: ProviderType
     let reviewFindings: [Finding]
     let debateFindings: [Finding]
     let shouldFail: Bool
@@ -12,12 +13,14 @@ struct MockProvider: ReviewProvider, Sendable {
     init(
         name: String = "MockModel",
         model: String = "mock-v1",
+        providerType: ProviderType = .openAI,
         reviewFindings: [Finding] = [],
         debateFindings: [Finding]? = nil,
         shouldFail: Bool = false
     ) {
         self.name = name
         self.model = model
+        self.providerType = providerType
         self.reviewFindings = reviewFindings
         self.debateFindings = debateFindings ?? reviewFindings
         self.shouldFail = shouldFail

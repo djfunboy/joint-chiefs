@@ -70,18 +70,21 @@ enum JointChiefsReviewTool {
 
         // Provider panel is assembled from env vars (CI fallback) or the keygetter
         // (Keychain-backed, the default for end users). See APIKeyResolver.
-        let providers = ProviderFactory.buildPanel(resolveKey: resolveKey)
+        // MCP clamps rounds to [0, 10] to keep autonomous agents from driving
+        // absurdly long debates per request; beyond that, per-connection rate
+        // limits (task #26) are the right control surface.
+        var strategy = StrategyConfigStore.load()
+        let providers = ProviderFactory.buildPanel(
+            resolveKey: resolveKey,
+            weights: strategy.providerWeights,
+            ollama: strategy.ollama
+        )
         guard !providers.isEmpty else {
             return errorResult("""
                 No LLM providers configured. Add keys via the Joint Chiefs setup app \
                 or export OPENAI_API_KEY / GEMINI_API_KEY / GROK_API_KEY / ANTHROPIC_API_KEY.
                 """)
         }
-
-        // MCP clamps rounds to [0, 10] to keep autonomous agents from driving
-        // absurdly long debates per request; beyond that, per-connection rate
-        // limits (task #26) are the right control surface.
-        var strategy = StrategyConfigStore.load()
         if let requestedRounds {
             strategy.maxRounds = max(0, min(requestedRounds, 10))
         } else {

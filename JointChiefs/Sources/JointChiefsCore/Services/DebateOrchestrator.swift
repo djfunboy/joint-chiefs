@@ -465,12 +465,27 @@ public actor DebateOrchestrator {
             return codeSummary
 
         case .votingThreshold:
-            let total = transcript.rounds.last?.responses.count ?? providers.count
-            guard total > 0 else { return codeSummary }
+            // Weight lookup: map "Provider (model)" label to the provider's weight.
+            // Labels mirror how ConsensusBuilder attaches `raisedBy` — keep in sync
+            // with `ConsensusBuilder.synthesize` if that formatting ever changes.
+            var weightByLabel: [String: Double] = [:]
+            for provider in providers {
+                let label = "\(provider.name) (\(provider.model))"
+                weightByLabel[label] = strategy.weight(for: provider.providerType)
+            }
+            let respondedLabels: [String] = transcript.rounds.last?.responses.map {
+                "\($0.providerName) (\($0.model))"
+            } ?? providers.map { "\($0.name) (\($0.model))" }
+            let totalWeight = respondedLabels.reduce(0.0) { acc, label in
+                acc + (weightByLabel[label] ?? 1.0)
+            }
+            guard totalWeight > 0 else { return codeSummary }
             let threshold = strategy.thresholdPercent
             return ConsensusBuilder.filter(codeSummary) { finding in
-                let raised = finding.raisedBy?.count ?? 0
-                return Double(raised) / Double(total) >= threshold
+                let raisedWeight = (finding.raisedBy ?? []).reduce(0.0) { acc, label in
+                    acc + (weightByLabel[label] ?? 1.0)
+                }
+                return raisedWeight / totalWeight >= threshold
             }
         }
     }
