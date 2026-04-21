@@ -1,7 +1,86 @@
 # Joint Chiefs — Data Model
 
-**Version:** 1.0
-**Last Updated:** 2026-04-08
+**Version:** 1.1
+**Last Updated:** 2026-04-19
+
+## Live Configuration Types
+
+These types are the ones actually in the shipping codebase. The SwiftData schema
+later in this document describes the deferred menu bar app and should be read as
+a future-direction reference, not a description of runtime state today.
+
+### StrategyConfig
+
+Persisted at `~/Library/Application Support/Joint Chiefs/strategy.json` via
+`StrategyConfigStore`. Read by the CLI, MCP server, and setup app; written
+only by the setup app.
+
+```swift
+public struct StrategyConfig: Codable, Sendable, Equatable {
+    public var moderator: ModeratorSelection          // .claude, .openai, .gemini, .grok, .none
+    public var tiebreaker: TiebreakerSelection        // .sameAsModerator | .specific(ModeratorSelection)
+    public var consensus: ConsensusMode               // .moderatorDecides, .strictMajority, .bestOfAll, .votingThreshold
+    public var maxRounds: Int                         // default 5 (adaptive early-break inside)
+    public var timeoutSeconds: Int                    // default 120
+    public var thresholdPercent: Double               // 0.0–1.0; only used by .votingThreshold
+    public var providerWeights: [ProviderType: Double] // 0 = excluded, 1.0 = default, >1 = heavier vote
+    public var rateLimits: RateLimits                 // MCP-only: maxConcurrentReviews, reviewsPerHour, dailySpendCapUSD?
+}
+```
+
+### providerWeights
+
+Semantics:
+
+- Missing entries default to `1.0`.
+- A weight of `0.0` (or any non-positive value) excludes the provider from the
+  spoke panel at `ProviderFactory.buildPanel` time, even if an API key is
+  available.
+- Non-zero weights drive voting-threshold math: the survival ratio is
+  `sum(weights of providers who raised the finding) / sum(weights of providers
+  that responded in the final round)`.
+
+On-disk JSON form is a readable object, not the Swift default flat-array:
+
+```json
+{
+  "providerWeights": {
+    "openAI": 1.5,
+    "gemini": 0.0,
+    "grok": 1.0,
+    "anthropic": 2.0
+  }
+}
+```
+
+Older `strategy.json` files that predate the field decode to `[:]` via
+`decodeIfPresent`, so upgrades are silent.
+
+### ProviderType
+
+```swift
+public enum ProviderType: String, Codable, CaseIterable, Sendable {
+    case openAI, anthropic, gemini, grok, ollama
+
+    public var envVarName: String       // CI-only fallback
+    public var keychainAccount: String? // nil for Ollama (no credential)
+    public var defaultModel: String
+    public var defaultEndpoint: String
+}
+```
+
+Every concrete `ReviewProvider` exposes a `providerType` property so the
+orchestrator can map a provider instance back to its `StrategyConfig` weight
+without string matching.
+
+---
+
+## Schema Overview (deferred menu bar app)
+
+> The rest of this document describes SwiftData models designed for the deferred
+> menu bar app (PRD F5/F7). Nothing below is live today — review transcripts
+> ship as Codable value types, settings as `StrategyConfig` above, and API keys
+> through the Keychain via the keygetter.
 
 ## Schema Overview
 
@@ -273,3 +352,4 @@ Keychain items use:
 | Version | Date | Changes |
 |---|---|---|
 | 1.0 | 2026-04-08 | Initial data model |
+| 1.1 | 2026-04-19 | Added "Live Configuration Types" section describing `StrategyConfig` (including `providerWeights`) and `ProviderType` as they actually exist in the shipping codebase. Marked the SwiftData section as deferred-menu-bar-app reference material. |

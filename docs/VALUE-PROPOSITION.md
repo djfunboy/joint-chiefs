@@ -11,9 +11,9 @@ Joint Chiefs is an MCP server that runs your code past OpenAI, Gemini, Grok, and
 
 Ships as three surfaces, one project:
 
-- **MCP server** — the primary integration. Drop it into Claude Code, Claude Desktop, Cursor, or any MCP-aware client. The host LLM calls `joint_chiefs_review` and gets back a consensus.
+- **MCP server** — the primary integration. Drop it into any MCP-aware client. The host LLM calls `joint_chiefs_review` and gets back a consensus.
 - **CLI** (`jointchiefs`) — for setup, debugging, headless use, and CI pipelines. Same engine, scriptable.
-- **macOS setup app** — one-shot installer GUI. Enter API keys with live test buttons, copy MCP config snippets per client, configure debate strategy, and let it install the CLI and MCP binaries to the right places.
+- **macOS setup app** — one-shot installer GUI. Enter API keys with live test buttons, copy a standard MCP config snippet, configure debate strategy, and let it install the CLI and MCP binaries to the right places.
 
 ## Problem Statement
 
@@ -29,7 +29,7 @@ Joint Chiefs is the answer to all four.
 ## Target Audience
 
 ### Primary: Developers Using AI-Native Coding Tools
-You're in Claude Code, Claude Desktop, Cursor, or another MCP-capable client every day. You already have API keys for two or more providers. You want higher-confidence review than your daily driver model can give itself, without leaving the chat.
+You're in an MCP-capable client every day. You already have API keys for two or more providers. You want higher-confidence review than your daily driver model can give itself, without leaving the chat.
 
 ### Secondary: Solo Developers and Small Teams in CI
 You want the same multi-model debate to gate pre-commit hooks, PR checks, or release builds. The CLI runs headless with JSON output and exit codes.
@@ -41,7 +41,7 @@ You care about *how* the models arrive at a conclusion. Full transcripts are wri
 
 1. **"Multi-model debate, not majority vote."** Models challenge each other across rounds. A well-argued minority position can override a weakly-justified majority — because the moderator reads the reasoning, not just the tally.
 2. **"Built for MCP first."** Discover it in your AI client's tool list. Invoke it like any other tool. The host LLM never touches the API keys; the server holds them.
-3. **"Setup takes one click, not one afternoon."** The macOS app installs the binaries, validates every API key, and emits a copy-paste MCP config block per client. The CLI is there when you want to script it.
+3. **"Setup takes one click, not one afternoon."** The macOS app installs the binaries, validates every API key, and emits a copy-paste MCP config snippet. The CLI is there when you want to script it.
 4. **"Research-backed."** Adaptive break, tit-for-tat engagement, judge arbitration — straight from the MAD literature. We cite the paper because it matters.
 5. **"Updates itself."** Sparkle for the app, custom EdDSA-signed updater for the CLI and MCP server. You get fixes the day they ship, even if you never open the GUI.
 
@@ -51,9 +51,9 @@ Each surface uses the same `JointChiefsCore` engine. Pick the one your workflow 
 
 | Surface | When to use it | What it gives you |
 |---|---|---|
-| **MCP server** | Daily review from inside Claude Code, Claude Desktop, Cursor, or any MCP host | Tool-call invocation, host LLM passes code, consensus comes back inline |
+| **MCP server** | Daily review from inside any MCP host | Tool-call invocation, host LLM passes code, consensus comes back inline |
 | **CLI** (`jointchiefs`) | Pre-commit hooks, CI, scripting, debugging a stuck debate, one-off audits | Streaming SSE output, JSON mode, exit codes, stdin piping |
-| **macOS setup app** | First install, key rotation, debate strategy tweaks | Live API key tests, per-client MCP config snippets, moderator/consensus/tiebreaker config, bundles and installs the CLI + MCP binaries |
+| **macOS setup app** | First install, key rotation, debate strategy tweaks | Live API key tests, standard MCP config snippet, moderator/consensus/tiebreaker config, bundles and installs the CLI + MCP binaries |
 
 The app is not required to use the product. The CLI is not required to use the MCP server. The MCP server is not required to use the CLI. Pick one, two, or all three.
 
@@ -69,7 +69,7 @@ The app is not required to use the product. The CLI is not required to use the M
 | Configurable moderator and tiebreaker | Use the model you trust most as judge; pick consensus mode (unanimous, majority, weighted) |
 | Streaming SSE on every provider | Tokens appear live in the CLI; the orchestrator can tell "slow" from "dead" |
 | Local transcripts | Full debate written to disk — replay, audit, or pipe into your own tooling |
-| One-click setup app | API key validation with live test buttons, copy-paste MCP config per client |
+| One-click setup app | API key validation with live test buttons, copy-paste MCP config snippet |
 | Auto-update everywhere | Sparkle for the app; EdDSA-signed updater for the CLI/MCP — works without ever launching the GUI |
 | Privacy-first | API keys stay local; no telemetry; the only network traffic is to providers you configured |
 
@@ -109,7 +109,7 @@ Recommended: candidate 1 for the hero, candidate 3 as a secondary subhead lower 
 
 ### Subhead
 
-Joint Chiefs is an MCP server for Claude Code, Claude Desktop, and Cursor that runs your code past OpenAI, Gemini, Grok, and Claude in parallel — then has them debate until consensus. Grounded in Multi-Agent Debate research. One-click macOS install. Zero telemetry.
+Joint Chiefs is an MCP server that runs your code past OpenAI, Gemini, Grok, and Claude in parallel — then has them debate until consensus. Grounded in Multi-Agent Debate research. One-click macOS install. Zero telemetry.
 
 ### Primary CTAs
 
@@ -125,7 +125,7 @@ Joint Chiefs is an MCP server for Claude Code, Claude Desktop, and Cursor that r
 
 - **Five providers, one consensus** — OpenAI, Gemini, Grok, Claude, Ollama
 - **Structured debate, not majority vote** — built on MAD protocol research
-- **Drops into your AI client** — MCP server for Claude Code, Claude Desktop, Cursor
+- **Drops into your AI client** — MCP server, works with any MCP-aware host
 - **One-click setup** — macOS app installs everything, validates every key
 - **Auto-updates** — Sparkle for the app, EdDSA-signed updater for the binaries
 - **Local-only** — no telemetry, no servers, your code never leaves your machine except to the providers you chose

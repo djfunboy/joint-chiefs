@@ -1,7 +1,7 @@
 # Joint Chiefs — Product Requirements Document
 
-**Version:** 1.1
-**Last Updated:** 2026-04-09
+**Version:** 1.2
+**Last Updated:** 2026-04-19
 
 ## Product Overview
 
@@ -11,7 +11,7 @@ A "war room" for AI-assisted code review where multiple LLMs independently analy
 
 ### Problem
 
-Solo developers using AI coding assistants get a single model's perspective on code review. Models have blind spots, biases, and different strengths. There's no easy way to get multiple AI opinions, have them challenge each other, and receive a unified recommendation — especially across different CLI tools (Claude Code, Codex, Gemini CLI, Grok).
+Solo developers using AI coding assistants get a single model's perspective on code review. Models have blind spots, biases, and different strengths. There's no easy way to get multiple AI opinions, have them challenge each other, and receive a unified recommendation — regardless of which AI client or CLI the developer is working in.
 
 ### Solution
 
@@ -29,7 +29,7 @@ Free, open-source tool for the developer community. No monetization planned.
 ## Target Users
 
 ### Primary: Solo Developers Using AI Coding Tools
-- Use Claude Code, Codex, Gemini CLI, or similar daily
+- Use an AI coding assistant daily
 - Want higher-quality code review than a single model provides
 - Value consensus-driven recommendations over single opinions
 - Have API keys for multiple LLM providers
@@ -71,8 +71,16 @@ CLI tool installed at `/opt/homebrew/bin/jointchiefs` (Apple Silicon Macs only).
 ### F5: macOS Menu Bar App — DEFERRED
 CLI-only works fine for solo use. Revisit if a GUI becomes necessary.
 
-### F6: Settings UI — DEFERRED
-Environment variables (`OPENAI_API_KEY`, `GEMINI_API_KEY`, `GROK_API_KEY`, `ANTHROPIC_API_KEY`, optional model overrides) cover configuration today.
+### F6: Setup App — DONE (scaffold)
+Single-window SwiftUI executable (`jointchiefs-setup`) that ships alongside
+the CLI and MCP server. Five sections:
+- [x] Data-handling disclosure (first-run)
+- [x] API keys screen — masked entry, Save/Test/Delete per provider via the keygetter
+- [x] Roles & Weights screen — moderator, tiebreaker, consensus mode, per-provider weight sliders (0 = excluded), rounds & timeout sliders, voting threshold slider
+- [x] Install screen — Homebrew/`~/.local/bin`/custom destination, PATH detection, copies the three binaries
+- [x] MCP config snippet — keyless JSON, Copy button
+- [ ] Bundled in `Joint Chiefs.app` with `Contents/Resources/` binaries (tracked in Phase 10)
+- [ ] VoiceOver + Dynamic Type pass (tracked in Phase 9)
 
 ### F7: Transcript Viewer — DEFERRED
 Local transcript files written to disk. A UI for browsing them is deferred with the menu bar app.
@@ -122,16 +130,16 @@ Local transcript files written to disk. A UI for browsing them is deferred with 
 4. Verify: `jointchiefs models`
 5. Ready — `jointchiefs review <file>` works from anywhere
 
-### Flow 2: Trigger Review from Claude Code Terminal
-1. User asks Claude: "Have the Joint Chiefs review src/auth.swift"
-2. Claude runs: `jointchiefs review src/auth.swift --goal "security review"`
+### Flow 2: Trigger Review from an AI Client Terminal
+1. User asks their AI client: "Have the Joint Chiefs review src/auth.swift"
+2. The AI runs: `jointchiefs review src/auth.swift --goal "security review"`
 3. Real-time streaming output shows:
    - Each general reviewing in parallel
    - Claude synthesizing brief between rounds
    - Each general's debate position
    - Adaptive break when positions converge
    - Final consensus from Claude
-4. Claude reads the result and presents to user
+4. The AI reads the result and presents to user
 
 ## Design Principles
 
@@ -146,7 +154,7 @@ Local transcript files written to disk. A UI for browsing them is deferred with 
 
 - Review cycle completes in < 90s for 3 models, 2 rounds
 - Consensus summary fits in < 2000 characters
-- Works with Claude Code, Codex, Gemini CLI, and Grok CLI without modification
+- Works with any AI CLI or MCP-aware client without modification
 - Zero data leaves the machine except to configured LLM APIs
 
 ## Revision History
@@ -155,3 +163,4 @@ Local transcript files written to disk. A UI for browsing them is deferred with 
 |---|---|---|
 | 1.0 | 2026-04-08 | Initial PRD |
 | 1.1 | 2026-04-09 | Updated F1-F8 status (F1-F4 DONE, F5-F7 DEFERRED, F8 PARTIAL); rewrote Flow 1 to reflect CLI build/install process; rewrote Flow 2 to show streaming output; dropped Flow 3 (menu bar app deferred) |
+| 1.2 | 2026-04-19 | F6 (Setup App) promoted from DEFERRED to DONE (scaffold) — `jointchiefs-setup` ships Disclosure/Keys/Roles-&-Weights/Install/MCP-Config sections; per-provider weighting (0 excludes, >1 amplifies voting weight) landed in `StrategyConfig`. Bundle wrapping + accessibility pass remain tracked in Phases 9 and 10. |

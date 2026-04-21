@@ -1,7 +1,7 @@
 # Joint Chiefs — Architecture
 
-**Version:** 1.2
-**Last Updated:** 2026-04-18
+**Version:** 1.3
+**Last Updated:** 2026-04-19
 
 ## System Overview
 
@@ -68,7 +68,7 @@ fallback if Claude is unavailable.
 | Secrets | macOS Keychain | API key storage |
 | Networking | URLSession | LLM API calls |
 | API Calls | URLSession.bytes (SSE streaming) | Stream LLM responses, no timeouts |
-| MCP (optional) | stdio wrapper | Claude Code native integration |
+| MCP (optional) | stdio wrapper | Native integration with any MCP client |
 | Minimum target | macOS 15 | @Observable, SwiftData |
 
 ## Project Structure
@@ -81,18 +81,23 @@ JointChiefs/
 ├── Sources/
 │   ├── JointChiefsCore/
 │   │   ├── Models/
-│   │   │   └── StrategyConfig.swift         (moderator/tiebreaker/consensus/rounds/timeout)
+│   │   │   └── StrategyConfig.swift         (moderator/tiebreaker/consensus/rounds/timeout/providerWeights)
 │   │   ├── Errors/
 │   │   └── Services/
-│   │       ├── APIKeyResolver.swift         (env → keygetter; CLI + MCP funnel through it)
+│   │       ├── APIKeyResolver.swift         (env → keygetter; read/write/delete; CLI + MCP + setup app funnel through it)
 │   │       ├── KeychainService.swift        (used *only* by the keygetter binary)
 │   │       ├── StrategyConfigStore.swift    (load/save ~/Library/Application Support/…)
+│   │       ├── ProviderFactory.swift        (panel assembly; filters `weight == 0`; moderator/tiebreaker builders)
 │   │       ├── ConsensusBuilder.swift
 │   │       ├── DebateOrchestrator.swift
-│   │       └── Providers/  (OpenAI, Gemini, Grok, Anthropic, Ollama)
+│   │       └── Providers/  (OpenAI, Gemini, Grok, Anthropic, Ollama — each exposes providerType)
 │   ├── JointChiefsCLI/                       (executable: jointchiefs)
 │   ├── JointChiefsMCP/                       (executable: jointchiefs-mcp — stdio only)
-│   └── JointChiefsKeygetter/                 (executable: jointchiefs-keygetter)
+│   ├── JointChiefsKeygetter/                 (executable: jointchiefs-keygetter)
+│   └── JointChiefsSetup/                     (executable: jointchiefs-setup — SwiftUI one-shot installer)
+│       ├── SetupApp.swift                   (@main, AppKit delegate for foreground activation)
+│       ├── Model/SetupModel.swift           (@Observable @MainActor state; probes Keychain on launch)
+│       └── Views/                           (DisclosureView, KeysView, RolesWeightsView, InstallView, MCPConfigView)
 └── Tests/JointChiefsCoreTests/
 ```
 
@@ -153,12 +158,41 @@ jointchiefs models --test
 
 Standalone stdio executable (`jointchiefs-mcp`) that wraps the orchestrator
 directly. Uses `modelcontextprotocol/swift-sdk` pinned to exact `0.12.0`.
-Spawned by AI clients (Claude Code, Claude Desktop, Cursor) via JSON-RPC over
-stdin/stdout. Exposes a single `joint_chiefs_review` tool.
+Spawned by any MCP client via JSON-RPC over stdin/stdout. Exposes a single
+`joint_chiefs_review` tool.
 
 **Stdio-only invariant.** Network transports (HTTP, SSE, WebSocket) are
 architecturally prohibited — every security assumption depends on the MCP
 client owning our stdio by definition.
+
+### Setup App
+
+Single-window SwiftUI executable (`jointchiefs-setup`) that onboards users
+without requiring shell surgery. Five sections, navigable via a sidebar:
+
+- **Data Handling** — first-run disclosure: what's sent to providers, what
+  stays local, what the app refuses to do (no telemetry, no analytics).
+- **API Keys** — masked entry per provider. Save writes to the Keychain via
+  `APIKeyResolver.writeViaKeygetter`; Test resolves the key and runs
+  `ReviewProvider.testConnection()`; Delete calls
+  `APIKeyResolver.deleteViaKeygetter`. Ollama is shown read-only.
+- **Roles & Weights** — moderator picker, tiebreaker picker, consensus-mode
+  picker, rounds and timeout sliders, per-provider weight sliders (0 = excluded
+  from panel, 1.0 = default vote, up to 3.0 = triple vote). Dirty-state
+  indicator plus an explicit Save action persisting to
+  `StrategyConfigStore.save(_:)`.
+- **Install** — destination picker (Homebrew prefix if writable, `~/.local/bin`
+  fallback, custom via `NSOpenPanel`), PATH detection, and a button that copies
+  `jointchiefs`, `jointchiefs-mcp`, and `jointchiefs-keygetter` into the chosen
+  directory with `0o755` perms.
+- **MCP Config** — generates a standard `mcpServers` JSON snippet that points
+  at the installed `jointchiefs-mcp` path. Works with any MCP client. No key
+  material in the snippet — keys live in the Keychain, resolved at tool-call
+  time.
+
+The setup app talks to the Keychain *only* through the keygetter for the same
+reason the CLI and MCP server do — see the keygetter section below. It does
+not link against `Security.framework` directly.
 
 ### APIKeyResolver and `jointchiefs-keygetter`
 
@@ -273,10 +307,29 @@ env var is a CI-only escape hatch; end users add keys via the setup app, which
 writes them to the Keychain through the keygetter.
 
 Other settings — moderator selection, consensus mode, tiebreaker, rounds,
-timeouts, rate limits — live in `StrategyConfig` and are persisted to
-`~/Library/Application Support/Joint Chiefs/strategy.json` (file mode 0600).
-CLI flags override per-invocation. `StrategyConfigStore.load()` falls back
-silently to `.default` when the file is missing or malformed.
+timeouts, rate limits, per-provider weights — live in `StrategyConfig` and are
+persisted to `~/Library/Application Support/Joint Chiefs/strategy.json`
+(file mode 0600). CLI flags override per-invocation.
+`StrategyConfigStore.load()` falls back silently to `.default` when the file
+is missing or malformed.
+
+### Per-Provider Weighting
+
+`StrategyConfig.providerWeights: [ProviderType: Double]` drives two behaviors:
+
+- **Panel inclusion.** A weight of `0.0` excludes the provider from the spoke
+  panel at `ProviderFactory.buildPanel` time, regardless of whether an API key
+  is available. Missing entries are treated as `1.0` (v1 behavior).
+- **Weighted voting.** In `ConsensusMode.votingThreshold`, the survival ratio
+  is computed as `sum(weights of providers who raised a finding) / sum(weights
+  of providers that responded in the final round)`. Equal weights reduce to
+  the pre-weighting raw-count ratio, so existing configs keep their exact
+  behavior.
+
+On disk the field serializes as a readable JSON object
+(`{"openAI": 1.5, "gemini": 0}`) rather than Swift's default flat-array form
+for enum-keyed dictionaries. See the custom `init(from:)` / `encode(to:)` in
+`StrategyConfig.swift`.
 
 | Variable | Purpose | Default |
 |---|---|---|
@@ -340,3 +393,4 @@ Claude model for per-round reviews and a larger one for the final call.
 | 1.0 | 2026-04-08 | Initial architecture |
 | 1.1 | 2026-04-09 | Reflect current state: hub-and-spoke debate with Claude as moderator, SSE streaming via `URLSession.bytes`, HTTP server deferred, project structure trimmed to what actually exists, environment-variable configuration documented, 5 providers including Anthropic. |
 | 1.2 | 2026-04-18 | v2 scope: added `jointchiefs-mcp` stdio server target, `jointchiefs-keygetter` as sole Keychain identity, `APIKeyResolver` as the env/keygetter funnel, `StrategyConfig` + `StrategyConfigStore` for moderator/consensus/rounds persistence. Removed the stale local-HTTP-server section. Security model updated for lean-baseline direction (Developer ID + notarization + Sparkle, no XPC, no custom updater). |
+| 1.3 | 2026-04-19 | Added the `JointChiefsSetup` SwiftUI target (`jointchiefs-setup`) with Disclosure / Keys / Roles-&-Weights / Install / MCP-Config sections; the setup app goes through `APIKeyResolver.writeViaKeygetter` / `deleteViaKeygetter` rather than linking Keychain directly. Documented `StrategyConfig.providerWeights` and the weighted-voting path in `DebateOrchestrator.applyConsensusMode`. `ReviewProvider` now exposes `providerType` so the orchestrator can map a provider instance to its configured weight. |

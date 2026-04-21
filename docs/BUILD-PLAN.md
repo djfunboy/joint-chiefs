@@ -1,7 +1,7 @@
 # Joint Chiefs — Build Plan
 
-**Version:** 1.2
-**Last Updated:** 2026-04-18
+**Version:** 1.3
+**Last Updated:** 2026-04-19
 
 ## What's Built
 
@@ -16,7 +16,10 @@ progress: CLI, stdio MCP server, and (still to come) a setup app.
 - **5 providers live:** OpenAI, Gemini, Grok, Anthropic Claude, Ollama — all SSE-streamed
 - **Hub-and-spoke debate:** OpenAI / Gemini / Grok are spokes, Claude is moderator/decider; adaptive early break on convergence
 - **Anonymous synthesis:** model identities stripped before the deciding model writes the final decision
-- **52 tests passing** (unit + orchestrator integration + APIKeyResolver with fake-keygetter harness)
+- **Four consensus modes wired through `DebateOrchestrator`:** `moderatorDecides`, `strictMajority`, `bestOfAll`, `votingThreshold` — with weighted voting when `providerWeights` is configured
+- **Per-provider weighting:** `StrategyConfig.providerWeights` drives panel inclusion (weight 0 = excluded) and voting-threshold math; surfaced in the setup app
+- **Setup app scaffold:** `jointchiefs-setup` SwiftUI executable target with Disclosure / Keys / Roles-&-Weights / Install / MCP-Config screens
+- **60 tests passing** (unit + orchestrator integration + consensus-mode coverage + weighted-voting + APIKeyResolver with fake-keygetter harness)
 
 Phases 1–3, 5, and the original Phase 8 (MCP wrapper) have real output. Phase 6
 (setup app) is the next build surface. v2 adds dedicated security/distribution
@@ -132,7 +135,7 @@ no custom updater, no XPC.
 
 ---
 
-## Phase 6: Setup App 🟡 IN PROGRESS
+## Phase 6: Setup App 🟢 SCAFFOLD COMPLETE
 
 **Goal:** Single-window SwiftUI app that lets end users add API keys and pick a
 strategy without touching env vars or the CLI. One-shot installer pattern —
@@ -145,16 +148,40 @@ surface that writes keys to the Keychain (via the keygetter) and persists
 `StrategyConfig`.
 
 **Steps:**
-1. ✅ `StrategyConfig` type defined in `JointChiefsCore`
+1. ✅ `StrategyConfig` type defined in `JointChiefsCore` — now includes `providerWeights`
 2. ✅ `StrategyConfigStore` load/save helpers
-3. ✅ `APIKeyResolver` consumed by CLI + MCP (no direct env reads in hot paths)
+3. ✅ `APIKeyResolver` consumed by CLI + MCP (no direct env reads in hot paths); `writeViaKeygetter` / `deleteViaKeygetter` added for the setup app
 4. ✅ `jointchiefs-keygetter` executable as the sole Keychain identity
-5. [ ] SwiftUI app target with the provider-keys screen (list of providers, masked entry, Test button per key)
-6. [ ] Strategy panel (moderator dropdown, consensus-mode radio, tiebreaker dropdown, rounds/timeout sliders)
-7. [ ] Install-location picker (`~/.local/bin/` default, Homebrew prefix detection, custom)
-8. [ ] PATH-on-install helper (detect `~/.local/bin` on `$PATH`, offer to append to `~/.zshrc`)
-9. [ ] MCP config snippet generator (keyless — keys live in Keychain)
-10. [ ] First-run data-handling disclosure screen
+5. ✅ SwiftUI app target (`jointchiefs-setup`): provider-keys screen with masked entry, Save, Test, and Delete per key
+6. ✅ Roles & Weights panel: moderator picker, tiebreaker picker, consensus-mode picker, per-provider weight sliders (0 = excluded, >0 = voting weight), rounds/timeout sliders, voting-threshold slider
+7. ✅ Install-location picker (default `/opt/homebrew/bin`, fallback `~/.local/bin`, custom via NSOpenPanel) — copies all three CLI binaries
+8. ✅ PATH-on-install helper (detects destination on `$PATH`, shows the exact `export` line when missing)
+9. ✅ MCP config snippet generator (keyless — reads destination path, outputs a standard `mcpServers` JSON block with a Copy button)
+10. ✅ First-run data-handling disclosure screen (what is sent off-device, what stays local, what the app doesn't do)
+
+**Remaining before distribution (tracked under Phase 10):**
+- App icon (`Resources/AppIcon.icns` + `CFBundleIconFile`). The bundle is functional without one; Finder just shows a generic icon.
+- Code signing (`codesign --sign <Developer ID>`) on the four binaries, with `jointchiefs-keygetter` signed with `--identifier com.jointchiefs.keygetter` per the Keychain-ACL design.
+- Notarization + stapling of the DMG artifact.
+- End-to-end test of the key-write path against a real Keychain — currently smoke-tested via the keygetter's own exit-code contract.
+
+**Build script** — `scripts/build-app.sh` runs `swift build -c release` and assembles `build/Joint Chiefs.app`:
+
+```
+Joint Chiefs.app/
+└── Contents/
+    ├── Info.plist                       (template in scripts/Info.plist; JC_VERSION/JC_BUILD env vars override)
+    ├── MacOS/jointchiefs-setup          (bundle's main executable)
+    └── Resources/
+        ├── jointchiefs                  (CLI)
+        ├── jointchiefs-mcp              (MCP stdio server)
+        └── jointchiefs-keygetter        (APIKeyResolver.locateKeygetter finds it here)
+```
+
+`APIKeyResolver` and `InstallView` both do bundle-aware path discovery so the
+keygetter and CLI sources are found via `Contents/Resources/` when the setup
+app runs from the bundle, and via flat-sibling when it runs from
+`.build/release/` during development.
 
 ---
 
@@ -176,7 +203,7 @@ surface that writes keys to the Keychain (via the keygetter) and persists
 
 ## Phase 8: MCP Server 🟡 IN PROGRESS
 
-**Goal:** Claude Code / Claude Desktop / Cursor native integration via MCP.
+**Goal:** Native integration with any MCP-aware client via the MCP stdio protocol.
 
 **Steps:**
 1. ✅ Adopt `modelcontextprotocol/swift-sdk` (pinned exact `0.12.0`)
@@ -185,10 +212,10 @@ surface that writes keys to the Keychain (via the keygetter) and persists
 4. ✅ Installed at `/opt/homebrew/bin/jointchiefs-mcp`
 5. [ ] Wire `APIKeyResolver` (done) + `StrategyConfig` (in progress) into MCP tool invocation
 6. [ ] Rate limits: 1 concurrent review, 30/hour cap, cancel on stdin close
-7. [ ] Register in Claude Code MCP config; document in README
+7. [ ] Ship the standard `mcpServers` JSON snippet in the setup app and README
 
 **Checkpoint:**
-- [x] From Claude Code: calling `joint_chiefs_review` returns consensus summary (pre-rate-limit / pre-strategy)
+- [x] From an MCP client: calling `joint_chiefs_review` returns consensus summary (pre-rate-limit / pre-strategy)
 - [x] MCP server starts/stops cleanly
 - [ ] Rate limits enforced and logged to stderr
 - [ ] Graceful cancellation on client disconnect
@@ -200,12 +227,12 @@ surface that writes keys to the Keychain (via the keygetter) and persists
 **Goal:** Production-ready quality.
 
 **Steps:**
-1. ✅ Orchestrator integration tests with mock providers (52 tests passing)
+1. ✅ Orchestrator integration tests with mock providers (60 tests passing — includes per-consensus-mode coverage, tiebreaker routing, weighted voting, and `providerWeights` JSON round-trip)
 2. ✅ Error handling audit for provider failure paths
 3. ✅ APIKeyResolver env/keygetter precedence covered with fake-keygetter harness
-4. [ ] Accessibility pass — surface in Phase 6 (setup app)
+4. [ ] Accessibility pass — VoiceOver/Dynamic Type on the setup app
 5. [ ] Performance profiling: memory, latency per full review cycle
-6. [ ] Documentation: README restructure for three-surface product
+6. [ ] Documentation: README restructure for three-surface product (four now — CLI, MCP, setup, keygetter)
 
 **Checkpoint:**
 - [x] All tests pass (52 passing)
@@ -253,3 +280,4 @@ reversed in favor of the standard Apple Developer flow.
 | 1.0 | 2026-04-08 | Initial build plan — 9 phases |
 | 1.1 | 2026-04-08 | Phases 1-3, 5 marked complete. Phase 4, 6, 7 deferred. Phase 8 marked future. Phase 9 partial. Added "What's Built" section. Anthropic provider added to Phase 2 scope. Hub-and-spoke architecture and adaptive break documented in Phase 3. |
 | 1.2 | 2026-04-18 | v2 scope: Phase 6 (setup app) and Phase 8 (MCP server) moved to in-progress. Added Phase 10 (security & distribution) with the lean security baseline. "What's Built" now lists keygetter + APIKeyResolver + StrategyConfig/Store + MCP server scaffold. Test count updated to 52. |
+| 1.3 | 2026-04-19 | Phase 6 steps 5-10 complete: `jointchiefs-setup` SwiftUI target scaffolded with Disclosure / Keys / Roles-&-Weights / Install / MCP-Config screens. `StrategyConfig.providerWeights` added — 0 excludes a provider from the panel, positive values drive weighted voting in `.votingThreshold` mode. `APIKeyResolver` gained `writeViaKeygetter` / `deleteViaKeygetter`. `ReviewProvider.providerType` added so the orchestrator can resolve per-provider weight from a provider instance. Test count 52 → 60. Phase 9 step 1 checkpoint updated. |

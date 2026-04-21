@@ -18,3 +18,7 @@ xcuserdata/
 # Build products
 DerivedData/
 build/
+*.app/
+
+# Stale review outputs and scratch
+tasks/jc-review-result.md
