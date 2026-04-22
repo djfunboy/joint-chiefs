@@ -40,28 +40,34 @@ public enum ProviderFactory {
             return weight <= 0
         }
 
+        let session = HardenedURLSession.shared
+
         if !isExcluded(.openAI), let key = resolveKey(.openAI) {
             providers.append(OpenAIProvider(
                 apiKey: key,
-                model: env["OPENAI_MODEL"] ?? ProviderType.openAI.defaultModel
+                model: env["OPENAI_MODEL"] ?? ProviderType.openAI.defaultModel,
+                urlSession: session
             ))
         }
         if !isExcluded(.gemini), let key = resolveKey(.gemini) {
             providers.append(GeminiProvider(
                 apiKey: key,
-                model: env["GEMINI_MODEL"] ?? ProviderType.gemini.defaultModel
+                model: env["GEMINI_MODEL"] ?? ProviderType.gemini.defaultModel,
+                urlSession: session
             ))
         }
         if !isExcluded(.grok), let key = resolveKey(.grok) {
             providers.append(GrokProvider(
                 apiKey: key,
-                model: env["GROK_MODEL"] ?? ProviderType.grok.defaultModel
+                model: env["GROK_MODEL"] ?? ProviderType.grok.defaultModel,
+                urlSession: session
             ))
         }
         if !isExcluded(.anthropic), let key = resolveKey(.anthropic) {
             providers.append(AnthropicProvider(
                 apiKey: key,
-                model: env["ANTHROPIC_MODEL"] ?? ProviderType.anthropic.defaultModel
+                model: env["ANTHROPIC_MODEL"] ?? ProviderType.anthropic.defaultModel,
+                urlSession: session
             ))
         }
 
@@ -108,16 +114,17 @@ public enum ProviderFactory {
         guard let type = selection.providerType else { return nil }
         guard let key = resolveKey(type) else { return nil }
 
+        let session = HardenedURLSession.shared
         switch type {
         case .openAI:
-            return OpenAIProvider(apiKey: key, model: env["OPENAI_MODEL"] ?? type.defaultModel)
+            return OpenAIProvider(apiKey: key, model: env["OPENAI_MODEL"] ?? type.defaultModel, urlSession: session)
         case .gemini:
-            return GeminiProvider(apiKey: key, model: env["GEMINI_MODEL"] ?? type.defaultModel)
+            return GeminiProvider(apiKey: key, model: env["GEMINI_MODEL"] ?? type.defaultModel, urlSession: session)
         case .grok:
-            return GrokProvider(apiKey: key, model: env["GROK_MODEL"] ?? type.defaultModel)
+            return GrokProvider(apiKey: key, model: env["GROK_MODEL"] ?? type.defaultModel, urlSession: session)
         case .anthropic:
             let model = env["CONSENSUS_MODEL"] ?? env["ANTHROPIC_MODEL"] ?? type.defaultModel
-            return AnthropicProvider(apiKey: key, model: model)
+            return AnthropicProvider(apiKey: key, model: model, urlSession: session)
         case .ollama:
             return nil
         }

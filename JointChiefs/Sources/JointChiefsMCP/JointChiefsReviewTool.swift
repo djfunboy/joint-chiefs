@@ -7,6 +7,12 @@ import MCP
 enum JointChiefsReviewTool {
     static let name = "joint_chiefs_review"
 
+    /// Process-wide rate limiter. Shared across every tool invocation so concurrency
+    /// and hourly quota are tracked for the server as a whole, not per-call. Limits
+    /// are read from `StrategyConfig.rateLimits` on each acquire so config changes
+    /// take effect without restarting the server.
+    static let rateLimiter = ReviewRateLimiter()
+
     static let definition = Tool(
         name: name,
         description: """
@@ -72,8 +78,47 @@ enum JointChiefsReviewTool {
         // (Keychain-backed, the default for end users). See APIKeyResolver.
         // MCP clamps rounds to [0, 10] to keep autonomous agents from driving
         // absurdly long debates per request; beyond that, per-connection rate
-        // limits (task #26) are the right control surface.
+        // limits (#26) are the right control surface.
         var strategy = StrategyConfigStore.load()
+
+        // Rate limit before doing any real work. Rejection surfaces as an
+        // MCP error so the client can back off or retry — no partial state
+        // is written to disk, no provider calls issue, no cost incurred.
+        let acquireResult = await rateLimiter.acquire(limits: strategy.rateLimits)
+        guard acquireResult == .acquired else {
+            let reason = acquireResult.rejectionMessage ?? "Rate limit exceeded."
+            return errorResult(reason)
+        }
+
+        // From here down, every return path must await `rateLimiter.release()`
+        // before returning — paired with the acquire above. Cancellation
+        // (stdin close) still unwinds through the awaits, which propagate
+        // Task.isCancelled into the orchestrator's structured concurrency.
+        let result = await runAcquiredReview(
+            code: code,
+            filePath: filePath,
+            goal: goal,
+            extraContext: extraContext,
+            requestedRounds: requestedRounds,
+            strategy: strategy
+        )
+        await rateLimiter.release()
+        return result
+    }
+
+    /// Executes the review after a rate-limit slot has been acquired. Factored
+    /// out so `invoke` can pair acquire/release around a single expression and
+    /// avoid scattering release calls across every early-return branch.
+    private static func runAcquiredReview(
+        code: String,
+        filePath: String?,
+        goal: String?,
+        extraContext: String?,
+        requestedRounds: Int?,
+        strategy: StrategyConfig
+    ) async -> CallTool.Result {
+        var strategy = strategy
+
         let providers = ProviderFactory.buildPanel(
             resolveKey: resolveKey,
             weights: strategy.providerWeights,
@@ -94,12 +139,17 @@ enum JointChiefsReviewTool {
         let moderator = ProviderFactory.build(for: strategy.moderator, resolveKey: resolveKey)
         let tiebreaker = ProviderFactory.buildTiebreaker(for: strategy.tiebreaker, resolveKey: resolveKey)
 
-        let orchestrator = DebateOrchestrator(
-            providers: providers,
-            moderator: moderator,
-            tiebreaker: tiebreaker,
-            strategy: strategy
-        )
+        let orchestrator: DebateOrchestrator
+        do {
+            orchestrator = try DebateOrchestrator(
+                providers: providers,
+                moderator: moderator,
+                tiebreaker: tiebreaker,
+                strategy: strategy
+            )
+        } catch {
+            return errorResult("Invalid strategy configuration: \(error.localizedDescription)")
+        }
 
         let reviewContext = ReviewContext(
             code: code,
