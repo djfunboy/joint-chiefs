@@ -3,10 +3,11 @@
 Multi-model AI code review orchestrator. Four surfaces — CLI, stdio MCP server, macOS setup app, and a single Keychain-access binary — all built from one `JointChiefsCore` engine. Sends code to multiple LLMs, runs a structured hub-and-spoke debate with Claude as moderator/decider, and streams a consensus summary back. Grounded in Multi-Agent Debate (MAD) research showing debate improves factuality and reasoning over single-model output.
 
 **Website:** https://jointchiefs.ai/ (live — source in the private `djfunboy/joint-chiefs-website` repo; this repo is the app)
+**Next session mission:** get the app fully ready to launch on the website. Start by reading `tasks/SESSION-HANDOFF-2026-04-21.md`.
 
 ## Current State
 
-- **Phases 1–5 complete.** Phase 6 (setup app) has shipped as a scaffold with every view migrated to Agentdeck tokens. Phase 8 (MCP server) is in progress — scaffolding + `joint_chiefs_review` tool ship, rate limits + strategy wiring still to land. Phase 10 (security + distribution) is in progress — website deployed to Netlify + DNS live, first notarized DMG still pending.
+- **Phases 1–5 complete.** Phase 6 (setup app) has shipped as a scaffold with every view migrated to Agentdeck tokens. Phase 8 (MCP server) is in progress — scaffolding + `joint_chiefs_review` tool ship, rate limits + strategy wiring still to land. Phase 10 (security + distribution) is in progress — website live at jointchiefs.ai with 10 articles + share buttons, first notarized DMG + real appcast entry still pending.
 - **CLI installed** at `/opt/homebrew/bin/jointchiefs` (Apple Silicon only). Calls the orchestrator directly — no local HTTP server.
 - **MCP server** at `jointchiefs-mcp` — stdio-only, wraps the orchestrator via `modelcontextprotocol/swift-sdk` pinned exact 0.12.0. Spawned by any MCP-aware client via JSON-RPC over stdio.
 - **Setup app** at `jointchiefs-setup` — one-shot SwiftUI installer (Disclosure / Keys / Roles-&-Weights / Install / MCP-Config). All five views use Agentdeck tokens end-to-end. Keychain access goes through the keygetter only.
@@ -27,6 +28,7 @@ Multi-model AI code review orchestrator. Four surfaces — CLI, stdio MCP server
 - **Streaming SSE always.** Non-streaming LLM calls are banned — they time out. Every provider uses `URLSession.bytes(for:)`.
 - **Never enumerate specific MCP clients or AI CLIs.** Use "any MCP client" / "any AI CLI" in docs, UI, comments, and commit messages. The product is MCP-spec-conformant.
 - **Stdio-only MCP.** Network transports (HTTP, SSE, WebSocket) are prohibited — every security assumption depends on the MCP client owning the MCP server's stdio.
+- **Voice for any long-form content.** Articles, blog posts, marketing copy — always load `/Users/chrisdoyle/Library/CloudStorage/Dropbox/Build/Content/voice-of-chris-doyle.md` first. It's the canonical voice for anything user-facing.
 
 ## Tech Stack
 
