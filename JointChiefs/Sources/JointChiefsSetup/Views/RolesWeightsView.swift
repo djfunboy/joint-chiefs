@@ -32,8 +32,8 @@ struct RolesWeightsView: View {
             .keyboardShortcut("s", modifiers: .command)
             .disabled(!model.strategyIsDirty)
 
-            Button("Next: Install") {
-                model.currentSection = .install
+            Button("Next: MCP Config") {
+                model.currentSection = .mcp
             }
             .buttonStyle(.agentPrimary)
             .keyboardShortcut(.defaultAction)

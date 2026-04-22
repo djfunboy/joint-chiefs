@@ -8,7 +8,7 @@ struct KeysView: View {
     var body: some View {
         SetupPage(
             title: "API Keys",
-            subtitle: "Paste each provider's API key. Keys are written to the macOS Keychain through the signed keygetter binary — nothing is stored in plain files."
+            subtitle: "Paste the API key for every provider you want on the panel. Keys are stored in the local Apple keychain."
         ) {
             VStack(spacing: AgentSpacing.md) {
                 ForEach(ProviderType.allCases, id: \.self) { provider in

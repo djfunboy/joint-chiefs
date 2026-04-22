@@ -27,17 +27,21 @@ struct RootView: View {
                 case .disclosure: DisclosureView()
                 case .keys: KeysView()
                 case .rolesWeights: RolesWeightsView()
-                case .install: InstallView()
                 case .mcp: MCPConfigView()
+                case .usage: UsageView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(Color.agentBgDeep)
         .task {
-            // Probe the Keychain after the window is visible. Keeps the first
-            // paint fast even when the keygetter triggers a macOS access prompt.
-            await model.refreshKeyStatuses()
+            // Probe the Keychain and copy CLI binaries into $PATH in parallel —
+            // both are independent and we don't want either blocking the first
+            // paint. Keychain probe may trigger a macOS access prompt; CLI
+            // install is filesystem-only and quick.
+            async let keys: () = model.refreshKeyStatuses()
+            async let cli: () = model.installCLIIfNeeded()
+            _ = await (keys, cli)
         }
     }
 }

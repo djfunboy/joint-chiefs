@@ -15,8 +15,8 @@ final class SetupModel {
         case disclosure = "Data Handling"
         case keys = "API Keys"
         case rolesWeights = "Roles & Weights"
-        case install = "Install"
         case mcp = "MCP Config"
+        case usage = "How to Use"
 
         var id: String { rawValue }
 
@@ -25,8 +25,8 @@ final class SetupModel {
             case .disclosure: "lock.shield"
             case .keys: "key.fill"
             case .rolesWeights: "slider.horizontal.3"
-            case .install: "square.and.arrow.down"
-            case .mcp: "terminal"
+            case .mcp: "puzzlepiece.extension.fill"
+            case .usage: "book.fill"
             }
         }
     }
@@ -69,10 +69,17 @@ final class SetupModel {
     /// per-provider Test actions.
     var keyStatuses: [ProviderType: KeyStatus] = [:]
 
-    // MARK: - Install
+    // MARK: - CLI install
+
+    enum CLIInstallStatus: Equatable {
+        case unknown
+        case installing
+        case installed(URL)        // path of the destination directory
+        case failed(String)        // error summary
+    }
 
     var installDestination: URL = SetupModel.defaultInstallDirectory()
-    var pathNeedsUpdate: Bool = false
+    var cliInstallStatus: CLIInstallStatus = .unknown
 
     // MARK: - Init
 
@@ -228,6 +235,109 @@ final class SetupModel {
         } catch {
             keyStatuses[provider] = .failed(error.localizedDescription)
         }
+    }
+
+    // MARK: - CLI install
+
+    /// Copies `jointchiefs`, `jointchiefs-mcp`, `jointchiefs-keygetter` from the
+    /// app bundle (or `.build/release` for dev) into `installDestination`. Skips
+    /// files that already match by size — common when installed via Homebrew
+    /// cask, which symlinks the same binaries from the bundle, or when the user
+    /// has launched the wizard before.
+    func installCLIIfNeeded() async {
+        // If installation already completed in this session, no-op.
+        if case .installing = cliInstallStatus { return }
+        if case .installed = cliInstallStatus { return }
+
+        cliInstallStatus = .installing
+
+        let destination = installDestination
+        guard let sourceDir = Self.bundledBinariesDir() else {
+            cliInstallStatus = .failed("Could not locate bundled CLI binaries.")
+            return
+        }
+
+        let binaries = ["jointchiefs", "jointchiefs-mcp", "jointchiefs-keygetter"]
+
+        do {
+            try FileManager.default.createDirectory(
+                at: destination,
+                withIntermediateDirectories: true
+            )
+            for name in binaries {
+                let src = sourceDir.appendingPathComponent(name)
+                let dst = destination.appendingPathComponent(name)
+                guard FileManager.default.fileExists(atPath: src.path) else {
+                    cliInstallStatus = .failed("Missing \(name) in bundle at \(sourceDir.path).")
+                    return
+                }
+                if Self.binariesMatch(src: src, dst: dst) {
+                    continue   // already installed (cask symlink or prior wizard run)
+                }
+                if FileManager.default.fileExists(atPath: dst.path) {
+                    try FileManager.default.removeItem(at: dst)
+                }
+                try FileManager.default.copyItem(at: src, to: dst)
+                try FileManager.default.setAttributes(
+                    [.posixPermissions: 0o755],
+                    ofItemAtPath: dst.path
+                )
+            }
+            cliInstallStatus = .installed(destination)
+        } catch {
+            cliInstallStatus = .failed(error.localizedDescription)
+        }
+    }
+
+    /// Forces a re-install to a user-chosen destination. Used by the recovery
+    /// affordance in MCP Config when the default destination wasn't writable.
+    func reinstallCLI(to destination: URL) async {
+        installDestination = destination
+        cliInstallStatus = .unknown
+        await installCLIIfNeeded()
+    }
+
+    /// True when the destination already has a binary that matches `src` by
+    /// size. Cheap check — full SHA would be more correct but the bundle binary
+    /// is the only legitimate source of these names so size collisions are
+    /// effectively impossible.
+    private static func binariesMatch(src: URL, dst: URL) -> Bool {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: dst.path) else { return false }
+        do {
+            let srcAttrs = try fm.attributesOfItem(atPath: src.path)
+            let dstAttrs = try fm.attributesOfItem(atPath: dst.path)
+            let srcSize = (srcAttrs[.size] as? NSNumber)?.intValue ?? -1
+            let dstSize = (dstAttrs[.size] as? NSNumber)?.intValue ?? -2
+            return srcSize == dstSize && srcSize > 0
+        } catch {
+            return false
+        }
+    }
+
+    /// Finds the directory containing the three CLI binaries to copy. Two shapes:
+    ///
+    /// - `.build/release/` (development via `swift run`): the setup exe sits next
+    ///   to its siblings. Return the exe's directory.
+    /// - `Joint Chiefs.app/Contents/MacOS/jointchiefs-setup` (bundled): the setup
+    ///   exe is in `Contents/MacOS/`, but the CLI binaries live in
+    ///   `Contents/Resources/`. Return the Resources directory.
+    static func bundledBinariesDir() -> URL? {
+        let exe = CommandLine.arguments.first ?? ""
+        let resolved = URL(fileURLWithPath: exe).resolvingSymlinksInPath()
+        let exeDir = resolved.deletingLastPathComponent()
+        let cliSibling = exeDir.appendingPathComponent("jointchiefs")
+        if FileManager.default.isExecutableFile(atPath: cliSibling.path) {
+            return exeDir
+        }
+        let resourcesDir = exeDir
+            .deletingLastPathComponent()
+            .appendingPathComponent("Resources", isDirectory: true)
+        let cliInResources = resourcesDir.appendingPathComponent("jointchiefs")
+        if FileManager.default.isExecutableFile(atPath: cliInResources.path) {
+            return resourcesDir
+        }
+        return nil
     }
 
     // MARK: - Defaults

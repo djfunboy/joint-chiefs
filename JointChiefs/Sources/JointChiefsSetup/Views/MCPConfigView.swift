@@ -12,17 +12,77 @@ struct MCPConfigView: View {
             subtitle: "Paste this into your AI client's MCP configuration. No keys live in this snippet — Joint Chiefs resolves them from the Keychain at request time."
         ) {
             VStack(alignment: .leading, spacing: AgentSpacing.lg) {
+                cliStatusPanel
                 configurationPanel
                 verificationPanel
-                completionPanel
             }
         } footer: {
-            Button("Close Setup") {
-                NSApp.keyWindow?.performClose(nil)
+            Button("Next: How to Use") {
+                model.currentSection = .usage
             }
             .buttonStyle(.agentPrimary)
             .keyboardShortcut(.defaultAction)
-            .accessibilityHint("Closes the Joint Chiefs Setup window and quits the app")
+        }
+    }
+
+    // MARK: - CLI install status
+
+    @ViewBuilder
+    private var cliStatusPanel: some View {
+        switch model.cliInstallStatus {
+        case .unknown, .installing:
+            HStack(spacing: AgentSpacing.sm) {
+                ProgressView().controlSize(.small)
+                Text("Installing `jointchiefs` CLI to \(model.installDestination.path)…")
+                    .font(.agentSmall)
+                    .foregroundStyle(Color.agentTextBody)
+                Spacer(minLength: 0)
+            }
+            .agentPanel()
+
+        case .installed(let dir):
+            HStack(spacing: AgentSpacing.sm) {
+                AgentPill(text: "CLI installed", kind: .success, icon: "checkmark.seal.fill")
+                Text(dir.path)
+                    .font(.agentXS)
+                    .foregroundStyle(Color.agentTextMuted)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 0)
+            }
+            .agentPanel(tint: Color.agentBgReady)
+
+        case .failed(let reason):
+            VStack(alignment: .leading, spacing: AgentSpacing.xs) {
+                HStack(spacing: AgentSpacing.sm) {
+                    AgentPill(text: "CLI install failed", kind: .warning, icon: "exclamationmark.triangle.fill")
+                    Spacer()
+                    Button("Choose location…") { chooseDestinationAndRetry() }
+                        .buttonStyle(.agentSecondary(size: .small))
+                }
+                Text(reason)
+                    .font(.agentXS)
+                    .foregroundStyle(Color.agentTextBody)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Or install via Homebrew: `brew install --cask joint-chiefs` (auto-symlinks the CLI to /opt/homebrew/bin).")
+                    .font(.agentXS)
+                    .foregroundStyle(Color.agentTextMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .agentPanel()
+        }
+    }
+
+    private func chooseDestinationAndRetry() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = model.installDestination
+        panel.prompt = "Install Here"
+        if panel.runModal() == .OK, let url = panel.url {
+            Task { await model.reinstallCLI(to: url) }
         }
     }
 
@@ -95,22 +155,6 @@ struct MCPConfigView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .agentPanel()
-    }
-
-    // MARK: - Completion
-
-    private var completionPanel: some View {
-        VStack(alignment: .leading, spacing: AgentSpacing.sm) {
-            HStack(spacing: AgentSpacing.sm) {
-                AgentPill(text: "all set", kind: .success, icon: "checkmark.seal.fill")
-                Spacer()
-            }
-            Text("You can run reviews from any terminal with `jointchiefs review <file>`, or from your AI client via the `joint_chiefs_review` tool. Close this window when you're ready — Joint Chiefs Setup is a one-shot installer and won't keep running in the background.")
-                .font(.agentSmall)
-                .foregroundStyle(Color.agentTextBody)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .agentPanel(tint: Color.agentBgReady)
     }
 
     private var mcpBinaryPath: String {
