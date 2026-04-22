@@ -79,7 +79,7 @@ enum JointChiefsReviewTool {
         // MCP clamps rounds to [0, 10] to keep autonomous agents from driving
         // absurdly long debates per request; beyond that, per-connection rate
         // limits (#26) are the right control surface.
-        var strategy = StrategyConfigStore.load()
+        let strategy = StrategyConfigStore.load()
 
         // Rate limit before doing any real work. Rejection surfaces as an
         // MCP error so the client can back off or retry — no partial state

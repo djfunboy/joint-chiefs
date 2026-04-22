@@ -64,15 +64,20 @@ public enum APIKeyResolver {
 
     // MARK: - Keygetter Discovery
 
-    /// First match wins:
-    ///   1. `JOINTCHIEFS_KEYGETTER_PATH` env override
+    /// Finds the `jointchiefs-keygetter` binary.
+    ///
+    ///   1. `JOINTCHIEFS_KEYGETTER_PATH` — absolute user override. If set, this
+    ///      is the only path consulted: a non-executable value returns nil
+    ///      rather than silently falling through to a different keygetter
+    ///      identity than the user asked for.
     ///   2. Sibling of current executable (e.g., `~/.local/bin/jointchiefs-keygetter`
-    ///      next to `~/.local/bin/jointchiefs`)
-    ///   3. App bundle: `/Applications/Joint Chiefs.app/Contents/Resources/jointchiefs-keygetter`
+    ///      next to `~/.local/bin/jointchiefs`).
+    ///   3. `../Resources/` relative to the running executable — covers the
+    ///      setup app running from `Joint Chiefs.app/Contents/MacOS/`.
+    ///   4. App bundle: `/Applications/Joint Chiefs.app/Contents/Resources/jointchiefs-keygetter`.
     public static func locateKeygetter() -> String? {
-        if let override = env("JOINTCHIEFS_KEYGETTER_PATH"),
-           FileManager.default.isExecutableFile(atPath: override) {
-            return override
+        if let override = env("JOINTCHIEFS_KEYGETTER_PATH") {
+            return FileManager.default.isExecutableFile(atPath: override) ? override : nil
         }
         for candidate in defaultSearchPaths() {
             if FileManager.default.isExecutableFile(atPath: candidate) {
