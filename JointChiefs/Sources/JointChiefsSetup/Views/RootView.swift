@@ -1,10 +1,12 @@
 import JointChiefsCore
 import SwiftUI
 
-/// Manual sidebar + detail layout. Replaced the earlier `NavigationSplitView`
-/// because on macOS 26 its internal List was rendering rows off-screen
-/// (confirmed in the a11y tree at y=-666) — a bug we can't work around
-/// without ditching the container entirely.
+/// Sidebar + detail layout. Each detail view owns its own SetupPage scaffold,
+/// which includes a scrollable body and a sticky footer, so the primary CTA
+/// never falls below the fold regardless of window size.
+///
+/// Replaces the earlier NavigationSplitView — on macOS 26 its internal List
+/// was rendering rows off-screen (confirmed in the a11y tree at y=-666).
 struct RootView: View {
 
     @Environment(SetupModel.self) private var model
@@ -20,20 +22,16 @@ struct RootView: View {
                 .frame(width: 1)
                 .accessibilityHidden(true)
 
-            ScrollView {
-                Group {
-                    switch model.currentSection {
-                    case .disclosure: DisclosureView()
-                    case .keys: KeysView()
-                    case .rolesWeights: RolesWeightsView()
-                    case .install: InstallView()
-                    case .mcp: MCPConfigView()
-                    }
+            Group {
+                switch model.currentSection {
+                case .disclosure: DisclosureView()
+                case .keys: KeysView()
+                case .rolesWeights: RolesWeightsView()
+                case .install: InstallView()
+                case .mcp: MCPConfigView()
                 }
-                .padding(AgentSpacing.xl2)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
-            .background(Color.agentBgDeep)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(Color.agentBgDeep)
         .task {
@@ -87,14 +85,16 @@ private struct SidebarRow: View {
                 .padding(.horizontal, AgentSpacing.md)
                 .padding(.vertical, AgentSpacing.sm)
                 .background(
-                    RoundedRectangle(cornerRadius: AgentRadius.md)
-                        .fill(isSelected ? Color.agentBgUncommitted : Color.clear)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: AgentRadius.md)
-                                .stroke(isSelected ? Color.agentTextAccent : Color.clear, lineWidth: 1)
-                        )
+                    RoundedRectangle(cornerRadius: AgentRadius.sm)
+                        .fill(isSelected ? Color.agentBgRow : Color.clear)
                 )
-                .foregroundStyle(isSelected ? Color.agentTextAccent : Color.agentTextBody)
+                .overlay(alignment: .leading) {
+                    Rectangle()
+                        .fill(isSelected ? Color.agentTextPrimary : Color.clear)
+                        .frame(width: 2)
+                        .accessibilityHidden(true)
+                }
+                .foregroundStyle(isSelected ? Color.agentTextPrimary : Color.agentTextBody)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

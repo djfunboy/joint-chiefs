@@ -6,17 +6,10 @@ struct KeysView: View {
     @Environment(SetupModel.self) private var model
 
     var body: some View {
-        VStack(alignment: .leading, spacing: AgentSpacing.lg) {
-            Text("API Keys")
-                .font(.agentDialogTitle)
-                .foregroundStyle(Color.agentTextPrimary)
-                .accessibilityAddTraits(.isHeader)
-
-            Text("Paste each provider's API key. Keys are written to the macOS Keychain through the signed keygetter binary — nothing is stored in plain files.")
-                .font(.agentDialogSubtitle)
-                .foregroundStyle(Color.agentTextBody)
-                .fixedSize(horizontal: false, vertical: true)
-
+        SetupPage(
+            title: "API Keys",
+            subtitle: "Paste each provider's API key. Keys are written to the macOS Keychain through the signed keygetter binary — nothing is stored in plain files."
+        ) {
             VStack(spacing: AgentSpacing.md) {
                 ForEach(ProviderType.allCases, id: \.self) { provider in
                     if provider == .ollama {
@@ -27,18 +20,39 @@ struct KeysView: View {
                     }
                 }
             }
-            .padding(.top, AgentSpacing.sm)
-
-            HStack {
-                Spacer()
-                Button("Next: Roles & Weights") {
-                    model.currentSection = .rolesWeights
-                }
-                .buttonStyle(.agentPrimary)
-                .keyboardShortcut(.defaultAction)
+            .padding(.top, AgentSpacing.xs)
+        } footer: {
+            Button("Next: Roles & Weights") {
+                model.currentSection = .rolesWeights
             }
-            .padding(.top, AgentSpacing.md)
+            .buttonStyle(.agentPrimary)
+            .keyboardShortcut(.defaultAction)
         }
+    }
+}
+
+// MARK: - Console URL map
+
+/// Where a user gets (or manages) their API key for each provider. Rendered as
+/// a ghost external-link button next to the provider name so first-time
+/// setup doesn't require a web search mid-flow.
+private func consoleURL(for provider: ProviderType) -> URL? {
+    switch provider {
+    case .openAI:    URL(string: "https://platform.openai.com/api-keys")
+    case .anthropic: URL(string: "https://console.anthropic.com/settings/keys")
+    case .gemini:    URL(string: "https://aistudio.google.com/apikey")
+    case .grok:      URL(string: "https://console.x.ai")
+    case .ollama:    URL(string: "https://ollama.com/download")
+    }
+}
+
+private func consoleLabel(for provider: ProviderType) -> String {
+    switch provider {
+    case .openAI:    "OpenAI console"
+    case .anthropic: "Anthropic console"
+    case .gemini:    "Google AI Studio"
+    case .grok:      "xAI console"
+    case .ollama:    "ollama.com"
     }
 }
 
@@ -53,10 +67,11 @@ private struct OllamaCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: AgentSpacing.md) {
-            HStack(alignment: .firstTextBaseline) {
+            HStack(alignment: .firstTextBaseline, spacing: AgentSpacing.sm) {
                 Text("Ollama (local models)")
                     .font(.agentHumanName)
                     .foregroundStyle(Color.agentTextPrimary)
+                ConsoleLink(provider: .ollama)
                 Spacer()
                 statusBadge
             }
@@ -173,6 +188,7 @@ private struct KeyRow: View {
                 Text(providerDisplayName)
                     .font(.agentHumanName)
                     .foregroundStyle(Color.agentTextPrimary)
+                ConsoleLink(provider: provider)
                 statusBadge
                 Spacer()
                 if case .saved = model.keyStatuses[provider] {
@@ -267,6 +283,39 @@ private struct KeyRow: View {
         case .failed(let message):
             AgentPill(text: message, kind: .error, icon: "exclamationmark.triangle.fill")
                 .accessibilityLabel("\(providerDisplayName) key error: \(message)")
+        }
+    }
+}
+
+// MARK: - Console link
+
+/// Small ghost external-link that opens the provider's API-key console in the
+/// default browser. Appears next to the provider name so first-time setup
+/// doesn't require a separate web search.
+private struct ConsoleLink: View {
+
+    let provider: ProviderType
+
+    var body: some View {
+        if let url = consoleURL(for: provider) {
+            Link(destination: url) {
+                HStack(spacing: AgentSpacing.xxs) {
+                    Text(consoleLabel(for: provider))
+                        .font(.agentXS)
+                    Image(systemName: "arrow.up.right.square")
+                        .font(.system(size: 10, weight: .medium))
+                }
+                .foregroundStyle(Color.agentTextAccent)
+                .padding(.vertical, AgentSpacing.xxs)
+                .padding(.horizontal, AgentSpacing.xs)
+                .background(
+                    RoundedRectangle(cornerRadius: AgentRadius.xs)
+                        .fill(Color.clear)
+                )
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Open \(consoleLabel(for: provider)) in browser")
         }
     }
 }

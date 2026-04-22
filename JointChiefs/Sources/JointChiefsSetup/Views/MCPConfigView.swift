@@ -7,29 +7,22 @@ struct MCPConfigView: View {
     @State private var copied = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: AgentSpacing.lg) {
-            Text("MCP Config Snippet")
-                .font(.agentDialogTitle)
-                .foregroundStyle(Color.agentTextPrimary)
-                .accessibilityAddTraits(.isHeader)
-
-            Text("Paste this into your AI client's MCP configuration. No keys live in this snippet — Joint Chiefs resolves them from the Keychain at request time.")
-                .font(.agentDialogSubtitle)
-                .foregroundStyle(Color.agentTextBody)
-                .fixedSize(horizontal: false, vertical: true)
-
-            configurationPanel
-            verificationPanel
-
-            HStack {
-                Spacer()
-                Button("Done") {
-                    NSApp.keyWindow?.performClose(nil)
-                }
-                .buttonStyle(.agentPrimary)
-                .keyboardShortcut(.defaultAction)
+        SetupPage(
+            title: "MCP Config Snippet",
+            subtitle: "Paste this into your AI client's MCP configuration. No keys live in this snippet — Joint Chiefs resolves them from the Keychain at request time."
+        ) {
+            VStack(alignment: .leading, spacing: AgentSpacing.lg) {
+                configurationPanel
+                verificationPanel
+                completionPanel
             }
-            .padding(.top, AgentSpacing.md)
+        } footer: {
+            Button("Close Setup") {
+                NSApp.keyWindow?.performClose(nil)
+            }
+            .buttonStyle(.agentPrimary)
+            .keyboardShortcut(.defaultAction)
+            .accessibilityHint("Closes the Joint Chiefs Setup window and quits the app")
         }
     }
 
@@ -102,6 +95,22 @@ struct MCPConfigView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .agentPanel()
+    }
+
+    // MARK: - Completion
+
+    private var completionPanel: some View {
+        VStack(alignment: .leading, spacing: AgentSpacing.sm) {
+            HStack(spacing: AgentSpacing.sm) {
+                AgentPill(text: "all set", kind: .success, icon: "checkmark.seal.fill")
+                Spacer()
+            }
+            Text("You can run reviews from any terminal with `jointchiefs review <file>`, or from your AI client via the `joint_chiefs_review` tool. Close this window when you're ready — Joint Chiefs Setup is a one-shot installer and won't keep running in the background.")
+                .font(.agentSmall)
+                .foregroundStyle(Color.agentTextBody)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .agentPanel(tint: Color.agentBgReady)
     }
 
     private var mcpBinaryPath: String {

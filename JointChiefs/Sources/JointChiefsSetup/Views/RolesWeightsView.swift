@@ -7,17 +7,10 @@ struct RolesWeightsView: View {
     @State private var saveError: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: AgentSpacing.lg) {
-            Text("Roles & Weights")
-                .font(.agentDialogTitle)
-                .foregroundStyle(Color.agentTextPrimary)
-                .accessibilityAddTraits(.isHeader)
-
-            Text("Pick who moderates the debate, who breaks ties, and how each provider's vote counts in the final consensus.")
-                .font(.agentDialogSubtitle)
-                .foregroundStyle(Color.agentTextBody)
-                .fixedSize(horizontal: false, vertical: true)
-
+        SetupPage(
+            title: "Roles & Weights",
+            subtitle: "Pick who moderates the debate, who breaks ties, and how each provider's vote counts in the final consensus."
+        ) {
             VStack(alignment: .leading, spacing: AgentSpacing.xl) {
                 moderatorSection
                 tiebreakerSection
@@ -25,39 +18,36 @@ struct RolesWeightsView: View {
                 weightsSection
                 debateShapeSection
             }
-            .padding(.top, AgentSpacing.sm)
-
-            HStack(spacing: AgentSpacing.sm) {
-                if model.strategyIsDirty {
-                    AgentPill(text: "unsaved changes", kind: .warning, icon: "circle.fill")
+            .padding(.top, AgentSpacing.xs)
+        } footer: {
+            Button("Save Strategy") {
+                do {
+                    try model.saveStrategy()
+                    saveError = nil
+                } catch {
+                    saveError = error.localizedDescription
                 }
-                if let saveError {
-                    Text(saveError)
-                        .font(.agentXS)
-                        .foregroundStyle(Color.agentError)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
-                Spacer()
-                Button("Save Strategy") {
-                    do {
-                        try model.saveStrategy()
-                        saveError = nil
-                    } catch {
-                        saveError = error.localizedDescription
-                    }
-                }
-                .buttonStyle(.agentSecondary)
-                .keyboardShortcut("s", modifiers: .command)
-                .disabled(!model.strategyIsDirty)
-
-                Button("Next: Install") {
-                    model.currentSection = .install
-                }
-                .buttonStyle(.agentPrimary)
-                .keyboardShortcut(.defaultAction)
             }
-            .padding(.top, AgentSpacing.md)
+            .buttonStyle(.agentSecondary)
+            .keyboardShortcut("s", modifiers: .command)
+            .disabled(!model.strategyIsDirty)
+
+            Button("Next: Install") {
+                model.currentSection = .install
+            }
+            .buttonStyle(.agentPrimary)
+            .keyboardShortcut(.defaultAction)
+        } leading: {
+            if model.strategyIsDirty {
+                AgentPill(text: "unsaved changes", kind: .warning, icon: "circle.fill")
+            }
+            if let saveError {
+                Text(saveError)
+                    .font(.agentXS)
+                    .foregroundStyle(Color.agentError)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
         }
     }
 
@@ -94,16 +84,28 @@ struct RolesWeightsView: View {
                 .foregroundStyle(Color.agentTextBody)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Picker("Tiebreaker", selection: tiebreakerBinding) {
-                Text("Same as moderator").tag(TiebreakerOption.sameAsModerator)
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: AgentSpacing.xs),
+                    GridItem(.flexible(), spacing: AgentSpacing.xs),
+                    GridItem(.flexible(), spacing: AgentSpacing.xs)
+                ],
+                alignment: .leading,
+                spacing: AgentSpacing.xs
+            ) {
+                AgentChip(
+                    label: "Same as moderator",
+                    isActive: isTiebreakerActive(.sameAsModerator),
+                    action: { model.setTiebreaker(.sameAsModerator) }
+                )
                 ForEach(ModeratorSelection.allCases, id: \.self) { selection in
-                    Text(label(for: selection)).tag(TiebreakerOption.specific(selection))
+                    AgentChip(
+                        label: label(for: selection),
+                        isActive: isTiebreakerActive(.specific(selection)),
+                        action: { model.setTiebreaker(.specific(selection)) }
+                    )
                 }
             }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .font(.agentBody)
-            .tint(Color.agentTextAccent)
         }
         .agentPanel()
     }
@@ -113,23 +115,15 @@ struct RolesWeightsView: View {
         case specific(ModeratorSelection)
     }
 
-    private var tiebreakerBinding: Binding<TiebreakerOption> {
-        Binding(
-            get: {
-                switch model.strategy.tiebreaker {
-                case .sameAsModerator: .sameAsModerator
-                case .specific(let selection): .specific(selection)
-                }
-            },
-            set: { option in
-                switch option {
-                case .sameAsModerator:
-                    model.setTiebreaker(.sameAsModerator)
-                case .specific(let selection):
-                    model.setTiebreaker(.specific(selection))
-                }
-            }
-        )
+    private func isTiebreakerActive(_ option: TiebreakerOption) -> Bool {
+        switch (model.strategy.tiebreaker, option) {
+        case (.sameAsModerator, .sameAsModerator):
+            return true
+        case (.specific(let current), .specific(let candidate)):
+            return current == candidate
+        default:
+            return false
+        }
     }
 
     // MARK: - Consensus Mode

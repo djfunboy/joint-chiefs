@@ -9,41 +9,32 @@ struct InstallView: View {
     @State private var isInstalling = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: AgentSpacing.lg) {
-            Text("Install CLI + MCP")
-                .font(.agentDialogTitle)
-                .foregroundStyle(Color.agentTextPrimary)
-                .accessibilityAddTraits(.isHeader)
+        SetupPage(
+            title: "Install CLI + MCP",
+            subtitle: "Copies `jointchiefs`, `jointchiefs-mcp`, and `jointchiefs-keygetter` to the chosen directory so your terminal and AI client can find them."
+        ) {
+            VStack(alignment: .leading, spacing: AgentSpacing.lg) {
+                destinationPanel
 
-            Text("Copies `jointchiefs`, `jointchiefs-mcp`, and `jointchiefs-keygetter` to the chosen directory so your terminal and AI client can find them.")
-                .font(.agentDialogSubtitle)
-                .foregroundStyle(Color.agentTextBody)
-                .fixedSize(horizontal: false, vertical: true)
-
-            destinationPanel
-
-            if let installResult {
-                resultPanel(for: installResult)
+                if let installResult {
+                    resultPanel(for: installResult)
+                }
             }
-
-            HStack(spacing: AgentSpacing.sm) {
-                Spacer()
-                if isInstalling {
-                    ProgressView().controlSize(.small)
-                }
-                Button("Install") {
-                    runInstall()
-                }
-                .buttonStyle(.agentPrimary)
-                .disabled(isInstalling)
-
-                Button("Next: MCP Config") {
-                    model.currentSection = .mcp
-                }
-                .buttonStyle(.agentSecondary)
-                .keyboardShortcut(.defaultAction)
+        } footer: {
+            if isInstalling {
+                ProgressView().controlSize(.small)
             }
-            .padding(.top, AgentSpacing.md)
+            Button("Install") {
+                runInstall()
+            }
+            .buttonStyle(.agentPrimary)
+            .disabled(isInstalling)
+
+            Button("Next: MCP Config") {
+                model.currentSection = .mcp
+            }
+            .buttonStyle(.agentSecondary)
+            .keyboardShortcut(.defaultAction)
         }
     }
 
