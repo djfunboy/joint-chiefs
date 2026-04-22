@@ -10,6 +10,7 @@ struct KeysView: View {
             Text("API Keys")
                 .font(.agentDialogTitle)
                 .foregroundStyle(Color.agentTextPrimary)
+                .accessibilityAddTraits(.isHeader)
 
             Text("Paste each provider's API key. Keys are written to the macOS Keychain through the signed keygetter binary — nothing is stored in plain files.")
                 .font(.agentDialogSubtitle)
@@ -77,14 +78,16 @@ private struct OllamaCard: View {
                 Rectangle()
                     .fill(Color.agentBorder)
                     .frame(height: 1)
+                    .accessibilityHidden(true)
 
                 labeledField("Endpoint") {
                     TextField(
-                        "http://localhost:11434",
+                        "",
                         text: Binding(
                             get: { model.strategy.ollama.endpoint },
                             set: { model.setOllamaEndpoint($0) }
-                        )
+                        ),
+                        prompt: Text("http://localhost:11434").foregroundStyle(Color.agentTextMuted)
                     )
                     .focused($focusedField, equals: .endpoint)
                     .agentInputStyle(focused: focusedField == .endpoint)
@@ -93,11 +96,12 @@ private struct OllamaCard: View {
                 HStack(spacing: AgentSpacing.sm) {
                     labeledField("Model") {
                         TextField(
-                            "llama3",
+                            "",
                             text: Binding(
                                 get: { model.strategy.ollama.model },
                                 set: { model.setOllamaModel($0) }
-                            )
+                            ),
+                            prompt: Text("llama3").foregroundStyle(Color.agentTextMuted)
                         )
                         .focused($focusedField, equals: .modelName)
                         .agentInputStyle(focused: focusedField == .modelName)
@@ -141,10 +145,14 @@ private struct OllamaCard: View {
                 ProgressView().controlSize(.small)
                 AgentPill(text: "testing…", kind: .warning)
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Ollama connection: testing")
         case .ok(let m):
             AgentPill(text: "\(m) reachable", kind: .success, icon: "checkmark.circle.fill")
+                .accessibilityLabel("Ollama: \(m) reachable")
         case .failed(let message):
             AgentPill(text: message, kind: .error, icon: "exclamationmark.triangle.fill")
+                .accessibilityLabel("Ollama error: \(message)")
         }
     }
 }
@@ -176,9 +184,13 @@ private struct KeyRow: View {
             }
 
             HStack(spacing: AgentSpacing.sm) {
-                SecureField("Paste API key", text: $localDraft)
-                    .focused($isFocused)
-                    .agentInputStyle(focused: isFocused)
+                SecureField(
+                    "",
+                    text: $localDraft,
+                    prompt: Text("Paste API key").foregroundStyle(Color.agentTextMuted)
+                )
+                .focused($isFocused)
+                .agentInputStyle(focused: isFocused)
 
                 Button("Save") {
                     let toSave = localDraft
@@ -238,17 +250,23 @@ private struct KeyRow: View {
         switch model.keyStatuses[provider] {
         case .unconfigured, .none:
             AgentPill(text: "not set", kind: .neutral)
+                .accessibilityLabel("\(providerDisplayName) key: not set")
         case .saved:
             AgentPill(text: "saved", kind: .success, icon: "lock.fill")
+                .accessibilityLabel("\(providerDisplayName) key: saved in Keychain")
         case .testing:
             HStack(spacing: AgentSpacing.xs) {
                 ProgressView().controlSize(.small)
                 AgentPill(text: "testing…", kind: .warning)
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(providerDisplayName) key: testing")
         case .ok(let model):
             AgentPill(text: "\(model) OK", kind: .success, icon: "checkmark.circle.fill")
+                .accessibilityLabel("\(providerDisplayName) key tested OK on \(model)")
         case .failed(let message):
             AgentPill(text: message, kind: .error, icon: "exclamationmark.triangle.fill")
+                .accessibilityLabel("\(providerDisplayName) key error: \(message)")
         }
     }
 }

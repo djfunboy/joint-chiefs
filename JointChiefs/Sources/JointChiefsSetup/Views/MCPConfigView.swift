@@ -11,6 +11,7 @@ struct MCPConfigView: View {
             Text("MCP Config Snippet")
                 .font(.agentDialogTitle)
                 .foregroundStyle(Color.agentTextPrimary)
+                .accessibilityAddTraits(.isHeader)
 
             Text("Paste this into your AI client's MCP configuration. No keys live in this snippet — Joint Chiefs resolves them from the Keychain at request time.")
                 .font(.agentDialogSubtitle)
@@ -85,6 +86,8 @@ struct MCPConfigView: View {
             }
             .buttonStyle(.agentGhost)
             .padding(AgentSpacing.xs)
+            .accessibilityLabel(copied ? "MCP configuration copied" : "Copy MCP configuration")
+            .accessibilityHint("Copies the JSON snippet to the clipboard")
         }
     }
 

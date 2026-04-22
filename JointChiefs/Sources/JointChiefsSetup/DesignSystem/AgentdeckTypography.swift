@@ -41,18 +41,25 @@ extension Font {
     static let agentBadge = Font.system(size: 10, weight: .semibold, design: .monospaced)
 
     // MARK: - Sans scale (prose-only moments)
+    //
+    // Sans-serif sites use text styles (.title3, .body) so they scale with
+    // Dynamic Type — Larger Text accessibility users see these grow. The mono
+    // scale is deliberately fixed-size ("monospace as identity") so the
+    // dashboard geometry doesn't warp at larger text settings; accessibility
+    // for mono content leans on VoiceOver and the system's zoom utilities.
 
-    /// Dialog title — system sans, 17pt semibold
-    static let agentDialogTitle = Font.system(size: 17, weight: .semibold)
+    /// Dialog title — system sans, `.title3` style, semibold. Scales with Dynamic Type.
+    static let agentDialogTitle = Font.system(.title3, design: .default, weight: .semibold)
 
-    /// Dialog subtitle — system sans, 13pt regular
-    static let agentDialogSubtitle = Font.system(size: 13, weight: .regular)
+    /// Dialog subtitle — system sans, `.body` style. Scales with Dynamic Type.
+    static let agentDialogSubtitle = Font.system(.body, design: .default, weight: .regular)
 
-    /// Field label in a dialog — system sans, 13pt medium
-    static let agentFieldLabel = Font.system(size: 13, weight: .medium)
+    /// Field label in a dialog — system sans, `.body` style, medium. Scales with Dynamic Type.
+    static let agentFieldLabel = Font.system(.body, design: .default, weight: .medium)
 
-    /// Human name row (model display name, persona) — system sans, 13pt regular
-    static let agentHumanName = Font.system(size: 13, weight: .regular)
+    /// Human name row (model display name, persona) — system sans, `.body` style.
+    /// Scales with Dynamic Type.
+    static let agentHumanName = Font.system(.body, design: .default, weight: .regular)
 }
 
 // MARK: - Tracking helpers

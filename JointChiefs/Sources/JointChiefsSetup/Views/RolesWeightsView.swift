@@ -11,6 +11,7 @@ struct RolesWeightsView: View {
             Text("Roles & Weights")
                 .font(.agentDialogTitle)
                 .foregroundStyle(Color.agentTextPrimary)
+                .accessibilityAddTraits(.isHeader)
 
             Text("Pick who moderates the debate, who breaks ties, and how each provider's vote counts in the final consensus.")
                 .font(.agentDialogSubtitle)
@@ -160,6 +161,7 @@ struct RolesWeightsView: View {
                         .font(.agentBody.monospacedDigit())
                         .foregroundStyle(Color.agentTextPrimary)
                         .frame(width: 140, alignment: .leading)
+                        .accessibilityHidden(true)
                     Slider(
                         value: Binding(
                             get: { model.strategy.thresholdPercent },
@@ -169,6 +171,8 @@ struct RolesWeightsView: View {
                         step: 0.05
                     )
                     .tint(Color.agentBrandBlue)
+                    .accessibilityLabel("Voting threshold percent")
+                    .accessibilityValue("\(Int(model.strategy.thresholdPercent * 100)) percent")
                 }
                 .padding(.top, AgentSpacing.xs)
             }
@@ -215,6 +219,7 @@ struct RolesWeightsView: View {
                     .font(.agentBody.monospacedDigit())
                     .foregroundStyle(Color.agentTextPrimary)
                     .frame(width: 140, alignment: .leading)
+                    .accessibilityHidden(true)
                 Slider(
                     value: Binding(
                         get: { Double(model.strategy.maxRounds) },
@@ -224,6 +229,8 @@ struct RolesWeightsView: View {
                     step: 1
                 )
                 .tint(Color.agentBrandBlue)
+                .accessibilityLabel("Max debate rounds")
+                .accessibilityValue("\(model.strategy.maxRounds)")
             }
 
             HStack(spacing: AgentSpacing.md) {
@@ -231,6 +238,7 @@ struct RolesWeightsView: View {
                     .font(.agentBody.monospacedDigit())
                     .foregroundStyle(Color.agentTextPrimary)
                     .frame(width: 140, alignment: .leading)
+                    .accessibilityHidden(true)
                 Slider(
                     value: Binding(
                         get: { Double(model.strategy.timeoutSeconds) },
@@ -240,6 +248,8 @@ struct RolesWeightsView: View {
                     step: 10
                 )
                 .tint(Color.agentBrandBlue)
+                .accessibilityLabel("Per-provider timeout in seconds")
+                .accessibilityValue("\(model.strategy.timeoutSeconds) seconds")
             }
         }
         .agentPanel()
@@ -269,6 +279,7 @@ private struct WeightSlider: View {
                 .font(.agentBody)
                 .foregroundStyle(Color.agentTextPrimary)
                 .frame(width: 140, alignment: .leading)
+                .accessibilityHidden(true)
             Slider(
                 value: Binding(
                     get: { model.strategy.weight(for: provider) },
@@ -278,11 +289,21 @@ private struct WeightSlider: View {
                 step: 0.1
             )
             .tint(Color.agentBrandBlue)
+            .accessibilityLabel("\(label) vote weight")
+            .accessibilityValue(accessibilityWeightValue)
             Text(weightLabel)
                 .font(.agentSmall.monospacedDigit())
                 .foregroundStyle(isExcluded ? Color.agentError : Color.agentTextBody)
                 .frame(width: 80, alignment: .trailing)
+                .accessibilityHidden(true)
         }
+    }
+
+    private var accessibilityWeightValue: String {
+        let value = model.strategy.weight(for: provider)
+        return isExcluded
+            ? "excluded (weight zero)"
+            : String(format: "%.1f times default", value)
     }
 
     private var label: String {

@@ -18,6 +18,16 @@ import SwiftUI
 ///
 /// The caller owns focus via `@FocusState` and passes `isFocused` in — wiring
 /// `@FocusState` inside a `ViewModifier` would divorce focus from the field.
+///
+/// Placeholder styling: SwiftUI uses `.secondary` for `TextField("label", ...)`
+/// placeholders by default, which reads as gray against the warm-dark surface.
+/// Use the `prompt:` parameter with a styled `Text` to match the design system:
+///
+///     TextField(
+///         "", text: $value,
+///         prompt: Text("your-model").foregroundStyle(Color.agentTextMuted)
+///     )
+///     .agentInputStyle(focused: isFocused)
 struct AgentInputStyle: ViewModifier {
 
     let isFocused: Bool
@@ -132,7 +142,9 @@ struct AgentChip: View {
 // MARK: - Section header
 
 /// Agentdeck panel/section eyebrow label — mono 12pt / 600, uppercase,
-/// 0.05em tracking, `agentTextAccent` warm-tan color.
+/// 0.05em tracking, `agentTextAccent` warm-tan color. VoiceOver reads this
+/// with the `.isHeader` trait so users can skip between sections using the
+/// rotor.
 struct AgentSectionHeader: View {
 
     let text: String
@@ -142,6 +154,7 @@ struct AgentSectionHeader: View {
             .font(.agentPanelHeader)
             .foregroundStyle(Color.agentTextAccent)
             .agentUppercaseCaption()
+            .accessibilityAddTraits(.isHeader)
     }
 }
 

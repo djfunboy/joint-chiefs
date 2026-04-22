@@ -9,6 +9,7 @@ struct DisclosureView: View {
             Text("Before you start")
                 .font(.agentDialogTitle)
                 .foregroundStyle(Color.agentTextPrimary)
+                .accessibilityAddTraits(.isHeader)
 
             Text("Joint Chiefs sends code you explicitly submit to the LLM providers you configure. Nothing is sent until you run a review.")
                 .font(.agentDialogSubtitle)
@@ -48,6 +49,7 @@ struct DisclosureView: View {
                 .font(.agentPanelHeader)
                 .foregroundStyle(Color.agentTextAccent)
                 .agentUppercaseCaption()
+                .accessibilityAddTraits(.isHeader)
             Text(body)
                 .font(.agentBody)
                 .foregroundStyle(Color.agentTextBody)

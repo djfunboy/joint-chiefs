@@ -13,6 +13,7 @@ struct InstallView: View {
             Text("Install CLI + MCP")
                 .font(.agentDialogTitle)
                 .foregroundStyle(Color.agentTextPrimary)
+                .accessibilityAddTraits(.isHeader)
 
             Text("Copies `jointchiefs`, `jointchiefs-mcp`, and `jointchiefs-keygetter` to the chosen directory so your terminal and AI client can find them.")
                 .font(.agentDialogSubtitle)
