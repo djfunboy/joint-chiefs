@@ -6,8 +6,15 @@ import os
 /// Coordinates multi-model code review through parallel initial reviews, structured debate
 /// rounds, and consensus synthesis.
 ///
-/// Uses Swift concurrency (`withThrowingTaskGroup`) to run all provider calls in parallel.
-/// Gracefully degrades when individual providers fail — only throws if all providers fail.
+/// Uses Swift concurrency (`withTaskGroup`) to run all provider calls in parallel.
+/// Gracefully degrades when individual providers fail — only throws if all providers fail
+/// during the initial review phase.
+///
+/// The public surface is two methods, both powered by a shared actor-isolated core:
+/// `runReview(context:)` returns the final `(summary, transcript)` tuple directly;
+/// `runReviewStreaming(context:)` wraps the same work in an `AsyncStream<ReviewEvent>`
+/// so consumers can watch the debate unfold in real time. Both observe the same
+/// cancellation, failure, and convergence semantics.
 public actor DebateOrchestrator {
 
     // MARK: - Private Properties
@@ -30,12 +37,20 @@ public actor DebateOrchestrator {
     ///
     /// Pass `moderator: nil` to run without any LLM-based synthesis — the orchestrator
     /// falls back to code-based consensus in every mode.
+    ///
+    /// - Throws: `OrchestratorError.invalidConfiguration` if `strategy.maxRounds` is
+    ///   negative. Zero is accepted (debate phase is skipped entirely).
     public init(
         providers: [any ReviewProvider],
         moderator: (any ReviewProvider)? = nil,
         tiebreaker: (any ReviewProvider)? = nil,
         strategy: StrategyConfig = .default
-    ) {
+    ) throws {
+        guard strategy.maxRounds >= 0 else {
+            throw OrchestratorError.invalidConfiguration(
+                reason: "maxRounds must be >= 0, got \(strategy.maxRounds)"
+            )
+        }
         self.providers = providers
         self.moderator = moderator
         self.tiebreaker = tiebreaker
@@ -50,8 +65,8 @@ public actor DebateOrchestrator {
         consensusProvider: (any ReviewProvider)? = nil,
         debateRounds: Int = 5,
         timeoutSeconds: Int = 120
-    ) {
-        self.init(
+    ) throws {
+        try self.init(
             providers: providers,
             moderator: consensusProvider,
             tiebreaker: nil,
@@ -68,13 +83,72 @@ public actor DebateOrchestrator {
     ///
     /// - Parameter context: The review context containing code, file path, and goal.
     /// - Returns: A tuple of the consensus summary and the full debate transcript.
-    /// - Throws: `OrchestratorError` if no providers are configured or all providers fail.
+    /// - Throws: `OrchestratorError` if no providers are configured or all providers fail
+    ///   during the initial review phase.
     public func runReview(
         context: ReviewContext
+    ) async throws -> (ConsensusSummary, DebateTranscript) {
+        try await runReviewCore(context: context, sink: { _ in })
+    }
+
+    /// Runs a streaming review that emits events as each phase progresses.
+    ///
+    /// Use this when you want real-time visibility into the debate. The stream
+    /// completes after emitting `.completed` or `.failed`.
+    ///
+    /// Cancellation: if the consumer stops iterating (e.g. CLI Ctrl-C breaks out
+    /// of `for await ...`), the underlying work Task is cancelled via
+    /// `continuation.onTermination`. `URLSession.bytes(for:)` and `TaskGroup`
+    /// both honor cooperative cancellation, so in-flight HTTP streams are torn
+    /// down and spoke requests stop issuing.
+    public func runReviewStreaming(context: ReviewContext) -> AsyncStream<ReviewEvent> {
+        AsyncStream { continuation in
+            let work = Task { [weak self] in
+                guard let self else {
+                    continuation.finish()
+                    return
+                }
+                do {
+                    let sink: @Sendable (ReviewEvent) -> Void = { event in
+                        continuation.yield(event)
+                    }
+                    let (summary, transcript) = try await self.runReviewCore(
+                        context: context,
+                        sink: sink
+                    )
+                    continuation.yield(.completed(summary: summary, transcript: transcript))
+                } catch is CancellationError {
+                    // Consumer stopped iterating — stay silent.
+                } catch {
+                    if !Task.isCancelled {
+                        continuation.yield(.failed(error: error.localizedDescription))
+                    }
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in
+                work.cancel()
+            }
+        }
+    }
+
+    // MARK: - Shared Core
+
+    /// Actor-isolated implementation shared by both `runReview` and `runReviewStreaming`.
+    /// Emits progress events through `sink`; the non-streaming path passes a no-op sink
+    /// and discards them. Throws typed `OrchestratorError` on unrecoverable failure
+    /// (no providers, every provider failed in the initial round) so callers can branch
+    /// on the error type.
+    private func runReviewCore(
+        context: ReviewContext,
+        sink: @escaping @Sendable (ReviewEvent) -> Void
     ) async throws -> (ConsensusSummary, DebateTranscript) {
         guard !providers.isEmpty else {
             throw OrchestratorError.noProviders
         }
+
+        let providerNames = providers.map { "\($0.name) (\($0.model))" }
+        sink(.sessionStarted(providers: providerNames, debateRounds: debateRounds))
 
         var transcript = DebateTranscript(
             filePath: context.filePath ?? "unknown",
@@ -83,16 +157,52 @@ public actor DebateOrchestrator {
         )
 
         // Phase 1: Parallel initial reviews
-        let initialResponses = try await runInitialReviews(context: context)
+        for provider in providers {
+            sink(.providerReviewing(name: "\(provider.name) (\(provider.model))"))
+        }
+
+        var initialResponses: [ProviderReview] = []
+        var initialErrors: [String] = []
+
+        await withTaskGroup(of: NamedResult.self) { group in
+            for provider in providers {
+                group.addTask {
+                    let name = "\(provider.name) (\(provider.model))"
+                    do {
+                        let review = try await provider.review(code: context.code, context: context)
+                        return NamedResult(name: name, result: .success(review))
+                    } catch {
+                        return NamedResult(name: name, result: .failure(error))
+                    }
+                }
+            }
+            for await named in group {
+                switch named.result {
+                case .success(let review):
+                    initialResponses.append(review)
+                    sink(.providerReviewed(review: review))
+                case .failure(let error):
+                    let message = error.localizedDescription
+                    logger.warning("Provider failed during initial review: \(message)")
+                    initialErrors.append(message)
+                    sink(.providerFailed(name: named.name, error: message))
+                }
+            }
+        }
+
+        guard !initialResponses.isEmpty else {
+            throw OrchestratorError.allProvidersFailed(errors: initialErrors)
+        }
+
         let initialRound = TranscriptRound(
             roundNumber: 0,
             phase: .independent,
             responses: initialResponses
         )
         transcript.rounds.append(initialRound)
+        sink(.initialReviewsComplete(responseCount: initialResponses.count))
 
         // Phase 2: Debate rounds (hub-and-spoke via moderator)
-        // Each round: generals report → Claude synthesizes → consolidated brief sent to next round
         var synthesizedFindings = initialResponses.flatMap { $0.findings }
 
         for roundNumber in 0..<debateRounds {
@@ -101,42 +211,79 @@ public actor DebateOrchestrator {
             // Between-round synthesis runs for every consensus mode — it's a
             // prompt-compaction pass, not a decision, so the final mode is irrelevant here.
             if let moderator {
-                synthesizedFindings = (try? await ConsensusBuilder.synthesizeRound(
+                sink(.moderatorSynthesizing(round: round))
+                if let consolidated = try? await ConsensusBuilder.synthesizeRound(
                     findings: synthesizedFindings,
                     code: context.code,
                     goal: context.goal ?? "General code review",
                     moderator: moderator
-                )) ?? synthesizedFindings
+                ) {
+                    synthesizedFindings = consolidated
+                    sink(.moderatorSynthesized(findingCount: consolidated.count, round: round))
+                }
             }
 
-            let debateResponses = try await runDebateRound(
-                code: context.code,
-                priorFindings: synthesizedFindings,
-                round: round
-            )
+            sink(.debateRoundStarting(round: round, totalRounds: debateRounds))
+
+            let findingsForRound = synthesizedFindings
+            var debateResponses: [ProviderReview] = []
+
+            await withTaskGroup(of: NamedResult.self) { group in
+                for provider in providers {
+                    group.addTask {
+                        let name = "\(provider.name) (\(provider.model))"
+                        do {
+                            let review = try await provider.debate(
+                                code: context.code,
+                                priorFindings: findingsForRound,
+                                round: round
+                            )
+                            return NamedResult(name: name, result: .success(review))
+                        } catch {
+                            return NamedResult(name: name, result: .failure(error))
+                        }
+                    }
+                }
+                for await named in group {
+                    switch named.result {
+                    case .success(let review):
+                        debateResponses.append(review)
+                        sink(.providerDebated(review: review, round: round))
+                    case .failure(let error):
+                        let message = error.localizedDescription
+                        logger.warning("Provider failed during debate round \(round): \(message)")
+                        sink(.providerFailed(name: named.name, error: message))
+                    }
+                }
+            }
+
             let debateRound = TranscriptRound(
                 roundNumber: round,
                 phase: .debate,
                 responses: debateResponses
             )
             transcript.rounds.append(debateRound)
-
-            // Update synthesized findings for next round
             synthesizedFindings = debateResponses.flatMap { $0.findings }
 
-            // Adaptive early stopping: if positions converged, stop debating
+            // If every provider failed this round, there is no new signal to debate
+            // and nothing for convergence detection to read. Stop rather than spin
+            // up another empty round that will likely fail the same way.
+            if debateResponses.isEmpty {
+                logger.warning("Debate round \(round) produced no responses — breaking early")
+                break
+            }
+
+            // Adaptive early stopping: if positions converged, stop debating.
             if round >= 2,
                let previousRound = transcript.rounds.dropLast().last,
                Self.checkConvergence(currentRound: debateRound, previousRound: previousRound) {
-                logger.info("Debate converged after round \(round) — stopping early")
+                sink(.debateConverged(afterRound: round))
                 break
             }
         }
 
         // Phase 3: Consensus synthesis
-        // Build code-based consensus from the final round, then branch on the
-        // configured ConsensusMode to decide whether to filter, include all,
-        // or hand off to a deciding LLM.
+        sink(.buildingConsensus)
         let codeSummary = ConsensusBuilder.synthesize(
             transcript: transcript,
             providers: providers
@@ -156,173 +303,6 @@ public actor DebateOrchestrator {
         return (summary, transcript)
     }
 
-    /// Runs a streaming review that emits events as each phase progresses.
-    ///
-    /// Use this when you want real-time visibility into the debate.
-    /// The stream completes after emitting `.completed` or `.failed`.
-    public func runReviewStreaming(context: ReviewContext) -> AsyncStream<ReviewEvent> {
-        let providers = self.providers
-        let moderator = self.moderator
-        let tiebreaker = self.tiebreaker
-        let strategy = self.strategy
-        let debateRounds = strategy.maxRounds
-
-        return AsyncStream { continuation in
-            Task {
-                do {
-                    guard !providers.isEmpty else {
-                        continuation.yield(.failed(error: "No providers configured"))
-                        continuation.finish()
-                        return
-                    }
-
-                    let providerNames = providers.map { "\($0.name) (\($0.model))" }
-                    continuation.yield(.sessionStarted(providers: providerNames, debateRounds: debateRounds))
-
-                    var transcript = DebateTranscript(
-                        filePath: context.filePath ?? "unknown",
-                        goal: context.goal ?? "General code review",
-                        codeSnippet: context.code
-                    )
-
-                    // Phase 1: Parallel initial reviews with per-provider events
-                    var initialResponses: [ProviderReview] = []
-                    var errors: [String] = []
-
-                    for provider in providers {
-                        continuation.yield(.providerReviewing(name: "\(provider.name) (\(provider.model))"))
-                    }
-
-                    await withTaskGroup(of: NamedResult.self) { group in
-                        for provider in providers {
-                            group.addTask {
-                                let name = "\(provider.name) (\(provider.model))"
-                                do {
-                                    let review = try await provider.review(code: context.code, context: context)
-                                    return NamedResult(name: name, result: .success(review))
-                                } catch {
-                                    return NamedResult(name: name, result: .failure(error))
-                                }
-                            }
-                        }
-
-                        for await named in group {
-                            switch named.result {
-                            case .success(let review):
-                                initialResponses.append(review)
-                                continuation.yield(.providerReviewed(review: review))
-                            case .failure(let error):
-                                let message = error.localizedDescription
-                                errors.append(message)
-                                continuation.yield(.providerFailed(name: named.name, error: message))
-                            }
-                        }
-                    }
-
-                    guard !initialResponses.isEmpty else {
-                        continuation.yield(.failed(error: "All providers failed: \(errors.joined(separator: ", "))"))
-                        continuation.finish()
-                        return
-                    }
-
-                    let initialRound = TranscriptRound(roundNumber: 0, phase: .independent, responses: initialResponses)
-                    transcript.rounds.append(initialRound)
-                    continuation.yield(.initialReviewsComplete(responseCount: initialResponses.count))
-
-                    // Phase 2: Debate rounds (hub-and-spoke via moderator)
-                    var synthesizedFindings = initialResponses.flatMap { $0.findings }
-
-                    for roundNumber in 0..<debateRounds {
-                        let round = roundNumber + 1
-
-                        // Moderator synthesizes before sending to generals
-                        if let moderator {
-                            continuation.yield(.moderatorSynthesizing(round: round))
-                            if let consolidated = try? await ConsensusBuilder.synthesizeRound(
-                                findings: synthesizedFindings,
-                                code: context.code,
-                                goal: context.goal ?? "General code review",
-                                moderator: moderator
-                            ) {
-                                synthesizedFindings = consolidated
-                                continuation.yield(.moderatorSynthesized(findingCount: consolidated.count, round: round))
-                            }
-                        }
-
-                        continuation.yield(.debateRoundStarting(round: round, totalRounds: debateRounds))
-
-                        let findingsForRound = synthesizedFindings
-                        var debateResponses: [ProviderReview] = []
-
-                        await withTaskGroup(of: NamedResult.self) { group in
-                            for provider in providers {
-                                group.addTask {
-                                    let name = "\(provider.name) (\(provider.model))"
-                                    do {
-                                        let review = try await provider.debate(code: context.code, priorFindings: findingsForRound, round: round)
-                                        return NamedResult(name: name, result: .success(review))
-                                    } catch {
-                                        return NamedResult(name: name, result: .failure(error))
-                                    }
-                                }
-                            }
-
-                            for await named in group {
-                                switch named.result {
-                                case .success(let review):
-                                    debateResponses.append(review)
-                                    continuation.yield(.providerDebated(review: review, round: round))
-                                case .failure(let error):
-                                    continuation.yield(.providerFailed(name: named.name, error: error.localizedDescription))
-                                }
-                            }
-                        }
-
-                        let debateRound = TranscriptRound(roundNumber: round, phase: .debate, responses: debateResponses)
-                        transcript.rounds.append(debateRound)
-                        synthesizedFindings = debateResponses.flatMap { $0.findings }
-
-                        // Adaptive early stopping
-                        if round >= 2,
-                           let previousRound = transcript.rounds.dropLast().last {
-                            let converged = Self.checkConvergence(
-                                currentRound: debateRound,
-                                previousRound: previousRound
-                            )
-                            if converged {
-                                continuation.yield(.debateConverged(afterRound: round))
-                                break
-                            }
-                        }
-                    }
-
-                    // Phase 3: Consensus
-                    continuation.yield(.buildingConsensus)
-                    let codeSummary = ConsensusBuilder.synthesize(
-                        transcript: transcript,
-                        providers: providers
-                    )
-
-                    let summary = try await Self.applyConsensusMode(
-                        codeSummary: codeSummary,
-                        transcript: transcript,
-                        providers: providers,
-                        moderator: moderator,
-                        tiebreaker: tiebreaker,
-                        strategy: strategy
-                    )
-                    transcript.consensusSummary = summary
-                    transcript.status = .completed
-
-                    continuation.yield(.completed(summary: summary, transcript: transcript))
-                } catch {
-                    continuation.yield(.failed(error: error.localizedDescription))
-                }
-                continuation.finish()
-            }
-        }
-    }
-
     // MARK: - Supporting Types
 
     /// Wraps a provider result with the provider's name for event reporting.
@@ -331,96 +311,11 @@ public actor DebateOrchestrator {
         let result: Result<ProviderReview, Error>
     }
 
-    // MARK: - Private Methods
-
-    /// Runs initial reviews across all providers in parallel with per-provider timeout.
-    private func runInitialReviews(
-        context: ReviewContext
-    ) async throws -> [ProviderReview] {
-        var responses: [ProviderReview] = []
-        var errors: [String] = []
-
-        await withTaskGroup(of: Result<ProviderReview, Error>.self) { group in
-            for provider in providers {
-                group.addTask {
-                    do {
-                        return .success(try await provider.review(code: context.code, context: context))
-                    } catch {
-                        return .failure(error)
-                    }
-                }
-            }
-
-            for await result in group {
-                switch result {
-                case .success(let review):
-                    responses.append(review)
-                case .failure(let error):
-                    let message = error.localizedDescription
-                    logger.warning("Provider failed during initial review: \(message)")
-                    errors.append(message)
-                }
-            }
-        }
-
-        guard !responses.isEmpty else {
-            throw OrchestratorError.allProvidersFailed(errors: errors)
-        }
-
-        return responses
-    }
-
-    /// Runs a single debate round across all providers in parallel.
-    private func runDebateRound(
-        code: String,
-        priorFindings: [Finding],
-        round: Int
-    ) async throws -> [ProviderReview] {
-        var responses: [ProviderReview] = []
-        var errors: [String] = []
-
-        await withTaskGroup(of: Result<ProviderReview, Error>.self) { group in
-            for provider in providers {
-                group.addTask {
-                    do {
-                        return .success(try await provider.debate(
-                            code: code,
-                            priorFindings: priorFindings,
-                            round: round
-                        ))
-                    } catch {
-                        return .failure(error)
-                    }
-                }
-            }
-
-            for await result in group {
-                switch result {
-                case .success(let review):
-                    responses.append(review)
-                case .failure(let error):
-                    let message = error.localizedDescription
-                    logger.warning("Provider failed during debate round \(round): \(message)")
-                    errors.append(message)
-                }
-            }
-        }
-
-        // Graceful degradation: allow debate rounds to continue with partial results.
-        // Only the initial review phase requires at least one response.
-        return responses
-    }
-
-    /// Collects all findings from all rounds in the transcript.
-    private func collectFindings(from transcript: DebateTranscript) -> [Finding] {
-        transcript.rounds.flatMap { round in
-            round.responses.flatMap { $0.findings }
-        }
-    }
+    // MARK: - Private Helpers
 
     /// Applies the configured `ConsensusMode` to a code-based summary, optionally invoking
-    /// the deciding LLM. Static so both `runReview` (actor-isolated) and `runReviewStreaming`
-    /// (Task-captured) can call it without re-deriving the logic.
+    /// the deciding LLM. Static so the function can be invoked from the non-isolated
+    /// `Task` spawned inside `runReviewStreaming` without re-deriving isolation.
     ///
     /// - `.moderatorDecides` — if any finding is split/solo and a decider exists
     ///   (`tiebreaker ?? moderator`), hand the transcript to that model. Otherwise
@@ -529,32 +424,5 @@ public actor DebateOrchestrator {
         let previousSeverities = previousFindings.map { $0.severity }.sorted()
 
         return currentSeverities == previousSeverities
-    }
-
-    /// Runs an async operation with a timeout, returning a Result.
-    private static func withTimeout<T: Sendable>(
-        seconds: Int,
-        operation: @escaping @Sendable () async throws -> T
-    ) async -> Result<T, Error> {
-        await withTaskGroup(of: Result<T, Error>.self) { group in
-            group.addTask {
-                do {
-                    let value = try await operation()
-                    return .success(value)
-                } catch {
-                    return .failure(error)
-                }
-            }
-
-            group.addTask {
-                try? await Task.sleep(for: .seconds(seconds))
-                return .failure(ProviderError.timeout)
-            }
-
-            // First to finish wins; cancel the other
-            let result = await group.next()!
-            group.cancelAll()
-            return result
-        }
     }
 }

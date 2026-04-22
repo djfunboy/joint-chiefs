@@ -60,7 +60,7 @@ struct Review: AsyncParsableCommand {
         let moderator = ProviderFactory.build(for: strategy.moderator, resolveKey: self.resolveKey)
         let tiebreaker = ProviderFactory.buildTiebreaker(for: strategy.tiebreaker, resolveKey: self.resolveKey)
 
-        let orchestrator = DebateOrchestrator(
+        let orchestrator = try DebateOrchestrator(
             providers: providers,
             moderator: moderator,
             tiebreaker: tiebreaker,

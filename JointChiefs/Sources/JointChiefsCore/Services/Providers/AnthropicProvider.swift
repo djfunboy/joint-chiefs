@@ -194,20 +194,20 @@ public struct AnthropicProvider: ReviewProvider {
     ///
     /// Claude has no enforced JSON-output mode (unlike OpenAI's `response_format`), so
     /// despite the prompt instruction to return only JSON, responses regularly arrive
-    /// wrapped in ```json ... ``` code fences or with surrounding prose. This method
-    /// extracts the first balanced `{...}` span before decoding, falling back to a
-    /// single finding with the raw content if no JSON object is found.
+    /// wrapped in ```json ... ``` code fences, with conversational preamble, or with
+    /// trailing explanatory prose that contains stray braces. This method enumerates
+    /// every balanced `{...}` span in the content and returns the findings from the
+    /// first one that decodes as `AnthropicFindingsResponse`. Falls back to a single
+    /// "Review Response" finding if no candidate span decodes.
     ///
     /// - Parameter content: The raw response content string.
     /// - Returns: An array of parsed `Finding` objects.
     private func parseFindings(from content: String) -> [Finding] {
-        guard let json = extractJSONObject(from: content),
-              let data = json.data(using: .utf8) else {
-            return [makeFallbackFinding(from: content)]
-        }
-
-        do {
-            let response = try JSONDecoder().decode(AnthropicFindingsResponse.self, from: data)
+        for candidate in extractBalancedJSONObjects(from: content) {
+            guard let data = candidate.data(using: .utf8),
+                  let response = try? JSONDecoder().decode(AnthropicFindingsResponse.self, from: data) else {
+                continue
+            }
             return response.findings.map { dto in
                 Finding(
                     title: dto.title,
@@ -218,21 +218,61 @@ public struct AnthropicProvider: ReviewProvider {
                     location: dto.location
                 )
             }
-        } catch {
-            return [makeFallbackFinding(from: content)]
         }
+        return [makeFallbackFinding(from: content)]
     }
 
-    /// Returns the substring spanning the first `{` to the last `}` in `content`,
-    /// or `nil` if none exists. JSONDecoder validates structural correctness — this
-    /// is just a cheap way to strip code fences and conversational preamble.
-    private func extractJSONObject(from content: String) -> String? {
-        guard let firstBrace = content.firstIndex(of: "{"),
-              let lastBrace = content.lastIndex(of: "}"),
-              firstBrace <= lastBrace else {
-            return nil
+    /// Returns every balanced `{...}` span in `content`, in order of appearance.
+    ///
+    /// Tracks JSON string-literal state (respecting `\"` escapes) so braces inside
+    /// quoted values do not affect depth. Unbalanced opening braces are skipped —
+    /// malformed tails don't poison earlier, well-formed candidates.
+    private func extractBalancedJSONObjects(from content: String) -> [String] {
+        let chars = Array(content)
+        var spans: [String] = []
+        var i = 0
+        while i < chars.count {
+            guard chars[i] == "{" else { i += 1; continue }
+
+            var depth = 0
+            var inString = false
+            var escape = false
+            var j = i
+            var matchedEnd: Int?
+
+            while j < chars.count {
+                let c = chars[j]
+                if inString {
+                    if escape {
+                        escape = false
+                    } else if c == "\\" {
+                        escape = true
+                    } else if c == "\"" {
+                        inString = false
+                    }
+                } else if c == "\"" {
+                    inString = true
+                } else if c == "{" {
+                    depth += 1
+                } else if c == "}" {
+                    depth -= 1
+                    if depth == 0 {
+                        matchedEnd = j
+                        break
+                    }
+                }
+                j += 1
+            }
+
+            if let end = matchedEnd {
+                spans.append(String(chars[i...end]))
+                i = end + 1
+            } else {
+                // Unbalanced — nothing further can match either
+                break
+            }
         }
-        return String(content[firstBrace...lastBrace])
+        return spans
     }
 
     private func makeFallbackFinding(from content: String) -> Finding {

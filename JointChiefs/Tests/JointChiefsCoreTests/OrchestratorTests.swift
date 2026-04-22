@@ -35,7 +35,7 @@ struct OrchestratorTests {
         let provider1 = MockProvider(name: "ModelA", model: "a-v1", reviewFindings: [finding1])
         let provider2 = MockProvider(name: "ModelB", model: "b-v1", reviewFindings: [finding2])
 
-        let orchestrator = DebateOrchestrator(providers: [provider1, provider2], debateRounds: 2)
+        let orchestrator = try DebateOrchestrator(providers: [provider1, provider2], debateRounds: 2)
         let (summary, transcript) = try await orchestrator.runReview(context: sampleContext)
 
         // 3 rounds: 1 initial + 2 debate
@@ -55,8 +55,8 @@ struct OrchestratorTests {
     // MARK: - No Providers
 
     @Test("Throws noProviders when no providers configured")
-    func noProviders() async {
-        let orchestrator = DebateOrchestrator(providers: [], debateRounds: 0)
+    func noProviders() async throws {
+        let orchestrator = try DebateOrchestrator(providers: [], debateRounds: 0)
 
         await #expect(throws: OrchestratorError.self) {
             try await orchestrator.runReview(context: sampleContext)
@@ -66,15 +66,80 @@ struct OrchestratorTests {
     // MARK: - All Providers Fail
 
     @Test("Throws allProvidersFailed when every provider errors")
-    func allProvidersFail() async {
+    func allProvidersFail() async throws {
         let failing1 = MockProvider(name: "Fail1", shouldFail: true)
         let failing2 = MockProvider(name: "Fail2", shouldFail: true)
 
-        let orchestrator = DebateOrchestrator(providers: [failing1, failing2], debateRounds: 0)
+        let orchestrator = try DebateOrchestrator(providers: [failing1, failing2], debateRounds: 0)
 
         await #expect(throws: OrchestratorError.self) {
             try await orchestrator.runReview(context: sampleContext)
         }
+    }
+
+    // MARK: - Invalid Configuration
+
+    @Test("Throws invalidConfiguration when maxRounds is negative")
+    func negativeMaxRoundsRejected() throws {
+        let provider = MockProvider(name: "A")
+        #expect(throws: OrchestratorError.self) {
+            _ = try DebateOrchestrator(providers: [provider], debateRounds: -1)
+        }
+    }
+
+    @Test("Zero maxRounds is a valid configuration")
+    func zeroMaxRoundsAccepted() throws {
+        let provider = MockProvider(name: "A")
+        _ = try DebateOrchestrator(providers: [provider], debateRounds: 0)
+    }
+
+    // MARK: - Empty Debate Round Break
+
+    @Test("Debate round where every provider fails breaks the loop early")
+    func emptyDebateRoundBreaks() async throws {
+        // Provider succeeds on the initial review but fails every debate call.
+        // Without the break, the orchestrator would record empty round after
+        // empty round up to maxRounds (5). With the break, exactly one empty
+        // round is recorded before stopping.
+        let finding = Finding(
+            title: "Initial finding",
+            description: "Some issue",
+            severity: .medium,
+            agreement: .solo,
+            recommendation: "Fix it",
+            location: "line 1"
+        )
+        let flaky = FlakyProvider(
+            name: "Flaky",
+            reviewFinding: finding
+        )
+        let orchestrator = try DebateOrchestrator(providers: [flaky], debateRounds: 5)
+        let (_, transcript) = try await orchestrator.runReview(context: sampleContext)
+
+        // 1 initial round + exactly 1 empty debate round (we break after detecting it).
+        #expect(transcript.rounds.count == 2)
+        #expect(transcript.rounds[1].phase == .debate)
+        #expect(transcript.rounds[1].responses.isEmpty)
+    }
+
+    /// Succeeds on `review` but always fails on `debate`. Used to verify the
+    /// empty-round break without triggering the "all providers failed" guard,
+    /// which fires only on the initial review phase.
+    private struct FlakyProvider: ReviewProvider, Sendable {
+        let name: String
+        let model: String = "flaky-v1"
+        let providerType: ProviderType = .openAI
+        let reviewFinding: Finding
+
+        func review(code: String, context: ReviewContext) async throws -> ProviderReview {
+            ProviderReview(providerName: name, model: model, content: "", findings: [reviewFinding])
+        }
+
+        func debate(code: String, priorFindings: [Finding], round: Int) async throws -> ProviderReview {
+            throw ProviderError.timeout
+        }
+
+        func testConnection() async throws -> Bool { true }
     }
 
     // MARK: - Graceful Degradation
@@ -92,7 +157,7 @@ struct OrchestratorTests {
         let working = MockProvider(name: "Working", reviewFindings: [finding])
         let failing = MockProvider(name: "Failing", shouldFail: true)
 
-        let orchestrator = DebateOrchestrator(providers: [working, failing], debateRounds: 1)
+        let orchestrator = try DebateOrchestrator(providers: [working, failing], debateRounds: 1)
         let (summary, transcript) = try await orchestrator.runReview(context: sampleContext)
 
         // Should complete with only the working provider
@@ -115,7 +180,7 @@ struct OrchestratorTests {
         )
         let provider = MockProvider(name: "Solo", reviewFindings: [finding])
 
-        let orchestrator = DebateOrchestrator(providers: [provider], debateRounds: 0)
+        let orchestrator = try DebateOrchestrator(providers: [provider], debateRounds: 0)
         let (_, transcript) = try await orchestrator.runReview(context: sampleContext)
 
         // Only the initial round, no debate rounds
@@ -129,7 +194,7 @@ struct OrchestratorTests {
     @Test("Transcript captures file path and goal from context")
     func transcriptMetadata() async throws {
         let provider = MockProvider(name: "Test")
-        let orchestrator = DebateOrchestrator(providers: [provider], debateRounds: 0)
+        let orchestrator = try DebateOrchestrator(providers: [provider], debateRounds: 0)
         let (_, transcript) = try await orchestrator.runReview(context: sampleContext)
 
         #expect(transcript.filePath == "auth.swift")
@@ -163,7 +228,7 @@ struct OrchestratorTests {
         let provB = MockProvider(name: "B", reviewFindings: [shared, solo])
 
         let strategy = StrategyConfig(consensus: .strictMajority, maxRounds: 1)
-        let orchestrator = DebateOrchestrator(
+        let orchestrator = try DebateOrchestrator(
             providers: [provA, provB],
             moderator: nil,
             strategy: strategy
@@ -184,7 +249,7 @@ struct OrchestratorTests {
         let provB = MockProvider(name: "B", reviewFindings: [onlyB])
 
         let strategy = StrategyConfig(consensus: .bestOfAll, maxRounds: 1)
-        let orchestrator = DebateOrchestrator(
+        let orchestrator = try DebateOrchestrator(
             providers: [provA, provB],
             moderator: nil,
             strategy: strategy
@@ -215,7 +280,7 @@ struct OrchestratorTests {
             maxRounds: 1,
             thresholdPercent: 0.66
         )
-        let orchestrator = DebateOrchestrator(
+        let orchestrator = try DebateOrchestrator(
             providers: [provA, provB, provC],
             moderator: nil,
             strategy: strategy
@@ -244,7 +309,7 @@ struct OrchestratorTests {
         let tiebreaker = MockProvider(name: "Tiebreaker", reviewFindings: [fromTiebreaker])
 
         let strategy = StrategyConfig(consensus: .moderatorDecides, maxRounds: 1)
-        let orchestrator = DebateOrchestrator(
+        let orchestrator = try DebateOrchestrator(
             providers: [provA, provB],
             moderator: moderator,
             tiebreaker: tiebreaker,
@@ -268,7 +333,7 @@ struct OrchestratorTests {
         let moderator = MockProvider(name: "Moderator", reviewFindings: [fromModerator])
 
         let strategy = StrategyConfig(consensus: .moderatorDecides, maxRounds: 1)
-        let orchestrator = DebateOrchestrator(
+        let orchestrator = try DebateOrchestrator(
             providers: [provA, provB],
             moderator: moderator,
             tiebreaker: nil,
@@ -313,7 +378,7 @@ struct OrchestratorTests {
             thresholdPercent: 0.5,
             providerWeights: [.openAI: 2.0, .gemini: 1.0, .grok: 1.0]
         )
-        let orchestrator = DebateOrchestrator(
+        let orchestrator = try DebateOrchestrator(
             providers: [heavy, lightA, lightB],
             moderator: nil,
             strategy: strategy
@@ -346,6 +411,79 @@ struct OrchestratorTests {
         #expect(types.contains(.grok))
         #expect(!types.contains(.gemini))
         #expect(!types.contains(.anthropic))
+    }
+
+    // MARK: - Streaming Cancellation
+
+    /// A slow provider that cooperates with cancellation. Used to verify that
+    /// `runReviewStreaming` tears down in-flight work when the consumer breaks
+    /// out of the stream early.
+    private actor CancellationCounter {
+        var started = 0
+        var finished = 0
+        func noteStart() { started += 1 }
+        func noteFinish() { finished += 1 }
+    }
+
+    private struct SlowProvider: ReviewProvider, Sendable {
+        let name: String
+        let model: String = "slow-v1"
+        let providerType: ProviderType = .openAI
+        let counter: CancellationCounter
+
+        func review(code: String, context: ReviewContext) async throws -> ProviderReview {
+            await counter.noteStart()
+            try await Task.sleep(for: .seconds(30))
+            await counter.noteFinish()
+            return ProviderReview(
+                providerName: name,
+                model: model,
+                content: "",
+                findings: []
+            )
+        }
+
+        func debate(code: String, priorFindings: [Finding], round: Int) async throws -> ProviderReview {
+            try await Task.sleep(for: .seconds(30))
+            return ProviderReview(
+                providerName: name,
+                model: model,
+                content: "",
+                findings: []
+            )
+        }
+
+        func testConnection() async throws -> Bool { true }
+    }
+
+    @Test("runReviewStreaming cancels in-flight work when consumer breaks early")
+    func streamingCancellationTearsDownWork() async throws {
+        let counter = CancellationCounter()
+        let provider = SlowProvider(name: "Slow", counter: counter)
+        let orchestrator = try DebateOrchestrator(providers: [provider], debateRounds: 0)
+
+        // Consume the first event, then break. Breaking drops the iterator,
+        // which triggers `onTermination` and cancels the work Task.
+        let startTime = Date()
+        for await event in await orchestrator.runReviewStreaming(context: sampleContext) {
+            if case .sessionStarted = event {
+                break
+            }
+        }
+        let elapsedUntilBreak = Date().timeIntervalSince(startTime)
+
+        // Wait briefly for cancellation to propagate into the spoke's Task.sleep.
+        try await Task.sleep(for: .milliseconds(300))
+
+        let started = await counter.started
+        let finished = await counter.finished
+
+        // Breaking the stream must return control promptly — well under the
+        // provider's 30s sleep — proving no synchronous wait for completion.
+        #expect(elapsedUntilBreak < 2.0)
+        // Spoke was cancelled mid-sleep, not allowed to run to completion.
+        #expect(started >= 1)
+        #expect(finished == 0)
     }
 
     @Test("StrategyConfig round-trips providerWeights through JSON")
