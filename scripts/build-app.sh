@@ -63,6 +63,14 @@ for name in jointchiefs jointchiefs-mcp jointchiefs-keygetter; do
     chmod 0755 "$APP_PATH/Contents/Resources/$name"
 done
 
+ICON_SRC="$REPO_ROOT/Resources/AppIcon.icns"
+if [[ -f "$ICON_SRC" ]]; then
+    echo "==> Copying AppIcon.icns into Contents/Resources"
+    cp "$ICON_SRC" "$APP_PATH/Contents/Resources/AppIcon.icns"
+else
+    echo "warn: $ICON_SRC missing — run scripts/generate-icon.sh before building for release" >&2
+fi
+
 echo "==> Done: $APP_PATH"
 echo "    open \"$APP_PATH\"   # launch"
 echo "    ls -la \"$APP_PATH/Contents\""

@@ -6,6 +6,8 @@
     <string>en</string>
     <key>CFBundleExecutable</key>
     <string>jointchiefs-setup</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>com.jointchiefs.setup</string>
     <key>CFBundleInfoDictionaryVersion</key>
