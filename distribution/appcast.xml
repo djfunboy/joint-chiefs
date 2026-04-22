@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Sparkle update feed for Joint Chiefs.
+
+    Deployed location: https://jointchiefs.ai/appcast.xml
+    Source of truth:   distribution/appcast.xml (this file, in the app repo)
+
+    When a new notarized DMG ships, copy the <item> template below, fill every
+    placeholder field, and push the updated file to the joint-chiefs-website
+    repo so Netlify re-deploys it. Sparkle verifies the EdDSA signature before
+    installing — generate it with `sign_update /path/to/Joint-Chiefs.dmg`
+    (ships with the Sparkle framework / `brew install --cask sparkle`) using
+    the private key stored in your keychain under `https://sparkle-project.org`.
+-->
+<rss version="2.0"
+     xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
+     xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <channel>
+        <title>Joint Chiefs</title>
+        <description>Multi-model AI code review orchestrator — update feed</description>
+        <language>en</language>
+        <link>https://jointchiefs.ai/</link>
+
+        <!--
+            Release template — copy, uncomment, replace every {{PLACEHOLDER}}.
+
+        <item>
+            <title>Version {{VERSION}}</title>
+            <pubDate>{{RFC_2822_DATE}}</pubDate>
+            <sparkle:version>{{BUILD_NUMBER}}</sparkle:version>
+            <sparkle:shortVersionString>{{VERSION}}</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[
+                <h2>What's new</h2>
+                <ul>
+                    <li>{{RELEASE_NOTE_1}}</li>
+                    <li>{{RELEASE_NOTE_2}}</li>
+                </ul>
+            ]]></description>
+            <enclosure
+                url="https://github.com/djfunboy/joint-chiefs/releases/download/v{{VERSION}}/Joint-Chiefs.dmg"
+                length="{{BYTE_COUNT}}"
+                type="application/octet-stream"
+                sparkle:edSignature="{{EDDSA_SIGNATURE}}"/>
+        </item>
+        -->
+
+    </channel>
+</rss>
