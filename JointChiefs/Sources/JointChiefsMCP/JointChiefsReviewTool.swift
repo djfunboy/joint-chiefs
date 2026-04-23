@@ -52,7 +52,18 @@ enum JointChiefsReviewTool {
         ])
     )
 
-    static func invoke(arguments: [String: Value]) async -> CallTool.Result {
+    /// Callback used by `invoke` to push round-boundary progress to the MCP
+    /// client via `notifications/progress`. Messages are prefixed with
+    /// "Joint Chiefs:" so clients that render progress text underneath the
+    /// tool-call spinner (Claude Code, Claude Desktop) show the product name
+    /// in the live indicator. Callers that don't want progress pass the
+    /// default no-op.
+    typealias ProgressSink = @Sendable (Double, Double, String) async -> Void
+
+    static func invoke(
+        arguments: [String: Value],
+        progress: @escaping ProgressSink = { _, _, _ in }
+    ) async -> CallTool.Result {
         // Extract and validate arguments.
         guard let codeValue = arguments["code"], case let .string(code) = codeValue else {
             return errorResult("Missing or non-string `code` argument.")
@@ -100,7 +111,8 @@ enum JointChiefsReviewTool {
             goal: goal,
             extraContext: extraContext,
             requestedRounds: requestedRounds,
-            strategy: strategy
+            strategy: strategy,
+            progress: progress
         )
         await rateLimiter.release()
         return result
@@ -115,7 +127,8 @@ enum JointChiefsReviewTool {
         goal: String?,
         extraContext: String?,
         requestedRounds: Int?,
-        strategy: StrategyConfig
+        strategy: StrategyConfig,
+        progress: @escaping ProgressSink
     ) async -> CallTool.Result {
         var strategy = strategy
 
@@ -123,7 +136,8 @@ enum JointChiefsReviewTool {
             resolveKey: resolveKey,
             weights: strategy.providerWeights,
             models: strategy.providerModels,
-            ollama: strategy.ollama
+            ollama: strategy.ollama,
+            openAICompatible: strategy.openAICompatible
         )
         guard !providers.isEmpty else {
             return errorResult("""
@@ -159,15 +173,66 @@ enum JointChiefsReviewTool {
             context: extraContext
         )
 
-        do {
-            let (summary, _) = try await orchestrator.runReview(context: reviewContext)
-            return CallTool.Result(
-                content: [.text(text: formatConsensus(summary), annotations: nil, _meta: nil)],
-                isError: false
-            )
-        } catch {
-            return errorResult("Review failed: \(error.localizedDescription)")
+        // Progress total = one slot for initial parallel reviews + one per
+        // debate round + one for final consensus synthesis. Progress ticks
+        // up monotonically as each stage boundary fires.
+        let totalSteps = Double(strategy.maxRounds + 2)
+
+        await progress(0, totalSteps, "Joint Chiefs: dispatching review to \(providers.count) provider\(providers.count == 1 ? "" : "s")")
+
+        let stream = await orchestrator.runReviewStreaming(context: reviewContext)
+        var finalSummary: ConsensusSummary?
+        var fatalError: String?
+
+        for await event in stream {
+            switch event {
+            case .initialReviewsComplete(let count):
+                await progress(1, totalSteps, "Joint Chiefs: \(count) initial review\(count == 1 ? "" : "s") collected — starting debate")
+
+            case .debateRoundStarting(let round, let totalRounds):
+                await progress(Double(round), totalSteps, "Joint Chiefs: round \(round)/\(totalRounds) — providers responding")
+
+            case .moderatorSynthesizing(let round):
+                await progress(Double(round) + 0.5, totalSteps, "Joint Chiefs: moderator synthesizing round \(round)")
+
+            case .debateConverged(let afterRound):
+                await progress(Double(afterRound) + 0.9, totalSteps, "Joint Chiefs: positions converged after round \(afterRound)")
+
+            case .buildingConsensus:
+                await progress(totalSteps - 0.1, totalSteps, "Joint Chiefs: writing final consensus")
+
+            case .providerFailed(let name, let error):
+                // Non-fatal — the orchestrator continues with remaining providers.
+                // Surface it so users know the panel degraded mid-run.
+                await progress(-1, totalSteps, "Joint Chiefs: \(name) failed — continuing with remaining providers (\(error))")
+
+            case .completed(let summary, _):
+                finalSummary = summary
+                await progress(totalSteps, totalSteps, "Joint Chiefs: review complete")
+
+            case .failed(let error):
+                fatalError = error
+
+            case .sessionStarted, .providerReviewing, .providerReviewed,
+                 .providerDebated, .moderatorSynthesized:
+                // Per-provider chatter is too noisy for MCP progress (the spec
+                // is for coarse milestones, not token-level streaming). Skip.
+                break
+            }
         }
+
+        if let fatalError {
+            return errorResult("Review failed: \(fatalError)")
+        }
+
+        guard let summary = finalSummary else {
+            return errorResult("Review completed without producing a summary.")
+        }
+
+        return CallTool.Result(
+            content: [.text(text: formatConsensus(summary), annotations: nil, _meta: nil)],
+            isError: false
+        )
     }
 
     // MARK: - Helpers

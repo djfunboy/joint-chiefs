@@ -43,7 +43,8 @@ struct Review: AsyncParsableCommand {
         let providers = buildProviders(
             weights: strategyForPanel.providerWeights,
             models: strategyForPanel.providerModels,
-            ollama: strategyForPanel.ollama
+            ollama: strategyForPanel.ollama,
+            openAICompatible: strategyForPanel.openAICompatible
         )
 
         guard !providers.isEmpty else {
@@ -265,8 +266,19 @@ struct Review: AsyncParsableCommand {
 
     // MARK: - Provider Setup
 
-    private func buildProviders(weights: [ProviderType: Double], models: [ProviderType: String], ollama: OllamaConfig) -> [any ReviewProvider] {
-        ProviderFactory.buildPanel(resolveKey: self.resolveKey, weights: weights, models: models, ollama: ollama)
+    private func buildProviders(
+        weights: [ProviderType: Double],
+        models: [ProviderType: String],
+        ollama: OllamaConfig,
+        openAICompatible: OpenAICompatibleConfig
+    ) -> [any ReviewProvider] {
+        ProviderFactory.buildPanel(
+            resolveKey: self.resolveKey,
+            weights: weights,
+            models: models,
+            ollama: ollama,
+            openAICompatible: openAICompatible
+        )
     }
 
     /// Env var → keygetter → nil. Surfaces keygetter errors to the user; silent

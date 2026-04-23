@@ -317,6 +317,7 @@ private struct WeightSlider: View {
         case .grok: "Grok"
         case .anthropic: "Anthropic"
         case .ollama: "Ollama"
+        case .openAICompatible: "LM Studio"
         }
     }
 

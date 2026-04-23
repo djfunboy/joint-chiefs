@@ -207,11 +207,15 @@ extension ProviderType {
         case .gemini: "GEMINI_API_KEY"
         case .grok: "GROK_API_KEY"
         case .ollama: "OLLAMA_API_KEY"
+        case .openAICompatible: "OPENAI_COMPATIBLE_API_KEY"
         }
     }
 
     /// Keychain account name for this provider. Ollama is local-only and has no
-    /// stored credential, so it returns nil.
+    /// stored credential, so it returns nil. OpenAI-compatible providers store
+    /// their (usually-empty) key directly in `StrategyConfig.openAICompatible.apiKey`
+    /// rather than in the Keychain — simpler for the 95% case where local servers
+    /// don't authenticate.
     public var keychainAccount: String? {
         switch self {
         case .openAI: "openai"
@@ -219,6 +223,7 @@ extension ProviderType {
         case .gemini: "gemini"
         case .grok: "grok"
         case .ollama: nil
+        case .openAICompatible: nil
         }
     }
 }

@@ -10,6 +10,7 @@ public struct OllamaProvider: ReviewProvider {
     public let providerType: ProviderType = .ollama
     private let endpoint: URL
     private let urlSession: URLSession
+    private let requestTimeout: TimeInterval
 
     // MARK: - Init
 
@@ -18,15 +19,21 @@ public struct OllamaProvider: ReviewProvider {
     /// - Parameters:
     ///   - model: The model identifier to use. Defaults to `"llama3"`.
     ///   - endpoint: The base URL for the Ollama server. Defaults to `http://localhost:11434`.
+    ///   - timeoutSeconds: Per-request timeout. Applied to both the `api/tags` probe
+    ///     (`testConnection`) and the streaming `api/chat` call. Defaults to 600s (10 minutes).
+    ///     Large local models (e.g. 70B) need real time for first-token latency —
+    ///     model load into VRAM alone can exceed the 60s `URLRequest` default.
     ///   - urlSession: The URL session to use for requests. Defaults to `.shared`.
     public init(
         model: String = "llama3",
         endpoint: URL = URL(string: "http://localhost:11434")!,
+        timeoutSeconds: Int = 600,
         urlSession: URLSession = .shared
     ) {
         self.name = "Ollama"
         self.model = model
         self.endpoint = endpoint
+        self.requestTimeout = TimeInterval(timeoutSeconds)
         self.urlSession = urlSession
     }
 
@@ -109,6 +116,7 @@ public struct OllamaProvider: ReviewProvider {
 
         var request = URLRequest(url: requestURL)
         request.httpMethod = "GET"
+        request.timeoutInterval = requestTimeout
 
         let data: Data
         let response: URLResponse
@@ -156,6 +164,7 @@ public struct OllamaProvider: ReviewProvider {
         var request = URLRequest(url: requestURL)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = requestTimeout
 
         let body = OllamaChatRequest(
             model: model,

@@ -31,6 +31,7 @@ public enum ProviderFactory {
         weights: [ProviderType: Double]? = nil,
         models: [ProviderType: String]? = nil,
         ollama: OllamaConfig? = nil,
+        openAICompatible: OpenAICompatibleConfig? = nil,
         env: [String: String] = ProcessInfo.processInfo.environment
     ) -> [any ReviewProvider] {
         var providers: [any ReviewProvider] = []
@@ -103,10 +104,49 @@ public enum ProviderFactory {
         if !isExcluded(.ollama), ollamaEnabled {
             let model = env["OLLAMA_MODEL"] ?? ollama?.model ?? ProviderType.ollama.defaultModel
             let endpointString = ollama?.endpoint ?? "http://localhost:11434"
+            let timeout = ollama?.timeoutSeconds ?? 600
             if let url = URL(string: endpointString) {
-                providers.append(OllamaProvider(model: model, endpoint: url))
+                providers.append(OllamaProvider(model: model, endpoint: url, timeoutSeconds: timeout))
             } else {
-                providers.append(OllamaProvider(model: model))
+                providers.append(OllamaProvider(model: model, timeoutSeconds: timeout))
+            }
+        }
+
+        // OpenAI-compatible local server (LM Studio, Jan, llama.cpp-server, etc.)
+        // Resolution precedence mirrors Ollama:
+        //   1. `OPENAI_COMPATIBLE_BASE_URL` / `OPENAI_COMPATIBLE_MODEL` env vars
+        //      (CI fallback). If either is set, the server is considered
+        //      enabled even when `StrategyConfig.openAICompatible.enabled` is false.
+        //   2. Otherwise, `openAICompatible.enabled` from StrategyConfig.
+        let openAICompatEnabled: Bool = {
+            if env["OPENAI_COMPATIBLE_BASE_URL"] != nil || env["OPENAI_COMPATIBLE_MODEL"] != nil {
+                return true
+            }
+            return openAICompatible?.enabled ?? false
+        }()
+        if !isExcluded(.openAICompatible), openAICompatEnabled {
+            let endpointString = env["OPENAI_COMPATIBLE_BASE_URL"]
+                ?? openAICompatible?.endpoint
+                ?? "http://localhost:1234/v1"
+            let modelName = env["OPENAI_COMPATIBLE_MODEL"]
+                ?? openAICompatible?.model
+                ?? ""
+            let apiKey = env["OPENAI_COMPATIBLE_API_KEY"]
+                ?? openAICompatible?.apiKey
+                ?? ""
+            let timeout = openAICompatible?.timeoutSeconds ?? 600
+            let displayName = openAICompatible?.presetName ?? "LM Studio"
+            // Skip if the caller forgot to configure a model — there's nothing
+            // meaningful to send. Logging falls back to the orchestrator's own
+            // panel-empty error surface.
+            if !modelName.isEmpty, let url = URL(string: endpointString) {
+                providers.append(OpenAICompatibleProvider(
+                    endpoint: url,
+                    model: modelName,
+                    apiKey: apiKey,
+                    timeoutSeconds: timeout,
+                    displayName: displayName
+                ))
             }
         }
 
@@ -158,6 +198,12 @@ public enum ProviderFactory {
             }
             return AnthropicProvider(apiKey: key, model: resolveModel(.anthropic, envKey: "ANTHROPIC_MODEL"), urlSession: session)
         case .ollama:
+            return nil
+        case .openAICompatible:
+            // Local OpenAI-compatible servers (LM Studio, Jan, llama.cpp) can't
+            // moderate — they're spokes only. The moderator role needs a model
+            // we've curated for consensus-synthesis behavior; local models vary
+            // too much to hand them that job by default.
             return nil
         }
     }

@@ -72,6 +72,16 @@ public struct StrategyConfig: Codable, Sendable, Equatable {
     /// regardless of this setting.
     public var ollama: OllamaConfig
 
+    // MARK: - Local Models (OpenAI-compatible — LM Studio, Jan, llama.cpp, etc.)
+
+    /// Configuration for an optional local inference server that speaks the
+    /// OpenAI chat-completions protocol. Covers LM Studio, Jan, llama.cpp-server,
+    /// Msty, LocalAI, and anything else compatible with `/v1/chat/completions`.
+    /// Sits alongside (not instead of) `ollama` — some users run both, and Ollama's
+    /// native protocol carries richer model-state signals we want to preserve.
+    /// The `OPENAI_COMPATIBLE_BASE_URL` env var remains a CI override for headless runs.
+    public var openAICompatible: OpenAICompatibleConfig
+
     // MARK: - Rate Limiting (MCP server only)
 
     /// Rate limits applied in the MCP server context, to defend against stuck
@@ -90,6 +100,7 @@ public struct StrategyConfig: Codable, Sendable, Equatable {
         providerWeights: [:],
         providerModels: [:],
         ollama: .default,
+        openAICompatible: .default,
         rateLimits: .default
     )
 
@@ -103,6 +114,7 @@ public struct StrategyConfig: Codable, Sendable, Equatable {
         providerWeights: [ProviderType: Double] = [:],
         providerModels: [ProviderType: String] = [:],
         ollama: OllamaConfig = .default,
+        openAICompatible: OpenAICompatibleConfig = .default,
         rateLimits: RateLimits = .default
     ) {
         self.moderator = moderator
@@ -114,6 +126,7 @@ public struct StrategyConfig: Codable, Sendable, Equatable {
         self.providerWeights = providerWeights
         self.providerModels = providerModels
         self.ollama = ollama
+        self.openAICompatible = openAICompatible
         self.rateLimits = rateLimits
     }
 
@@ -144,7 +157,7 @@ extension StrategyConfig {
     // defaults so old configs still decode cleanly.
     private enum CodingKeys: String, CodingKey {
         case moderator, tiebreaker, consensus, maxRounds, timeoutSeconds
-        case thresholdPercent, providerWeights, providerModels, ollama, rateLimits
+        case thresholdPercent, providerWeights, providerModels, ollama, openAICompatible, rateLimits
     }
 
     public init(from decoder: Decoder) throws {
@@ -178,6 +191,7 @@ extension StrategyConfig {
         }
         self.providerModels = models
         self.ollama = try c.decodeIfPresent(OllamaConfig.self, forKey: .ollama) ?? .default
+        self.openAICompatible = try c.decodeIfPresent(OpenAICompatibleConfig.self, forKey: .openAICompatible) ?? .default
         self.rateLimits = try c.decode(RateLimits.self, forKey: .rateLimits)
     }
 
@@ -202,6 +216,7 @@ extension StrategyConfig {
         }
         try c.encode(rawModels, forKey: .providerModels)
         try c.encode(ollama, forKey: .ollama)
+        try c.encode(openAICompatible, forKey: .openAICompatible)
         try c.encode(rateLimits, forKey: .rateLimits)
     }
 }
@@ -216,17 +231,114 @@ public struct OllamaConfig: Codable, Sendable, Equatable {
     /// Base URL for the Ollama server. Defaults to `http://localhost:11434`; set
     /// to a LAN address to point at a shared Ollama host.
     public var endpoint: String
+    /// Request timeout in seconds. Applied to both `testConnection()` and each
+    /// streaming chat request. Local models — especially large ones like
+    /// deepseek-r1:70b — often need minutes for the first response (model load
+    /// into VRAM + token generation). Cloud providers typically respond in
+    /// seconds, so Ollama gets its own knob. Default is 600 (10 minutes),
+    /// which is generous enough for a 70B model on first invocation but short
+    /// enough that a dead server surfaces before users lose patience.
+    public var timeoutSeconds: Int
 
     public static let `default` = OllamaConfig(
         enabled: false,
         model: "llama3",
-        endpoint: "http://localhost:11434"
+        endpoint: "http://localhost:11434",
+        timeoutSeconds: 600
     )
 
-    public init(enabled: Bool = false, model: String = "llama3", endpoint: String = "http://localhost:11434") {
+    public init(
+        enabled: Bool = false,
+        model: String = "llama3",
+        endpoint: String = "http://localhost:11434",
+        timeoutSeconds: Int = 600
+    ) {
         self.enabled = enabled
         self.model = model
         self.endpoint = endpoint
+        self.timeoutSeconds = timeoutSeconds
+    }
+
+    // Custom decoding so older strategy.json files that predate `timeoutSeconds`
+    // upgrade silently to the new default instead of failing to load.
+    private enum CodingKeys: String, CodingKey {
+        case enabled, model, endpoint, timeoutSeconds
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? false
+        self.model = try c.decodeIfPresent(String.self, forKey: .model) ?? "llama3"
+        self.endpoint = try c.decodeIfPresent(String.self, forKey: .endpoint) ?? "http://localhost:11434"
+        self.timeoutSeconds = try c.decodeIfPresent(Int.self, forKey: .timeoutSeconds) ?? 600
+    }
+}
+
+// MARK: - OpenAICompatibleConfig
+
+/// Configuration for an optional local inference server that speaks the OpenAI
+/// `/v1/chat/completions` protocol — LM Studio, Jan, llama.cpp-server, Msty,
+/// LocalAI, etc. Runs alongside `OllamaConfig`; both can be active in the same
+/// debate if the user wants.
+public struct OpenAICompatibleConfig: Codable, Sendable, Equatable {
+    /// Whether to include this server as a spoke in the debate panel.
+    public var enabled: Bool
+    /// Model identifier as the server exposes it (LM Studio: whatever's loaded;
+    /// Jan / llama.cpp: the model tag). Matches what `/v1/models` returns.
+    public var model: String
+    /// Base URL ending in `/v1`. LM Studio default is `http://localhost:1234/v1`.
+    public var endpoint: String
+    /// API key to send in the `Authorization: Bearer` header. Most local servers
+    /// ignore this; some (hosted aggregators, locked-down LAN deployments)
+    /// require it. Empty string is permitted and omits the header.
+    public var apiKey: String
+    /// Per-request timeout in seconds. Matches Ollama's default (600s / 10 min)
+    /// because the failure mode is identical — local models need real time for
+    /// first-token latency, especially on first invocation after model load.
+    public var timeoutSeconds: Int
+    /// Display-only hint for the setup app UI (e.g. "LM Studio", "Jan",
+    /// "llama.cpp", "Custom"). Does not affect runtime behavior.
+    public var presetName: String
+
+    public static let `default` = OpenAICompatibleConfig(
+        enabled: false,
+        model: "",
+        endpoint: "http://localhost:1234/v1",
+        apiKey: "",
+        timeoutSeconds: 600,
+        presetName: "LM Studio"
+    )
+
+    public init(
+        enabled: Bool = false,
+        model: String = "",
+        endpoint: String = "http://localhost:1234/v1",
+        apiKey: String = "",
+        timeoutSeconds: Int = 600,
+        presetName: String = "LM Studio"
+    ) {
+        self.enabled = enabled
+        self.model = model
+        self.endpoint = endpoint
+        self.apiKey = apiKey
+        self.timeoutSeconds = timeoutSeconds
+        self.presetName = presetName
+    }
+
+    // Custom decoding so older strategy.json files (v0.1.0–v0.3.1) that don't
+    // have this block decode cleanly with all defaults.
+    private enum CodingKeys: String, CodingKey {
+        case enabled, model, endpoint, apiKey, timeoutSeconds, presetName
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? false
+        self.model = try c.decodeIfPresent(String.self, forKey: .model) ?? ""
+        self.endpoint = try c.decodeIfPresent(String.self, forKey: .endpoint) ?? "http://localhost:1234/v1"
+        self.apiKey = try c.decodeIfPresent(String.self, forKey: .apiKey) ?? ""
+        self.timeoutSeconds = try c.decodeIfPresent(Int.self, forKey: .timeoutSeconds) ?? 600
+        self.presetName = try c.decodeIfPresent(String.self, forKey: .presetName) ?? "LM Studio"
     }
 }
 

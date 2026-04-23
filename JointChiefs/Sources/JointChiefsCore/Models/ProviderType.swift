@@ -1,7 +1,7 @@
 import Foundation
 
 public enum ProviderType: String, Codable, CaseIterable, Sendable {
-    case openAI, anthropic, gemini, grok, ollama
+    case openAI, anthropic, gemini, grok, ollama, openAICompatible
 
     public var defaultEndpoint: String {
         switch self {
@@ -10,6 +10,7 @@ public enum ProviderType: String, Codable, CaseIterable, Sendable {
         case .gemini: "https://generativelanguage.googleapis.com/v1beta"
         case .grok: "https://api.x.ai/v1"
         case .ollama: "http://localhost:11434"
+        case .openAICompatible: "http://localhost:1234/v1"
         }
     }
 
@@ -20,6 +21,7 @@ public enum ProviderType: String, Codable, CaseIterable, Sendable {
         case .gemini: "gemini-3.1-pro-preview"
         case .grok: "grok-3"
         case .ollama: "llama3"
+        case .openAICompatible: ""
         }
     }
 
@@ -66,6 +68,9 @@ public enum ProviderType: String, Codable, CaseIterable, Sendable {
                 "grok-beta"       // experimental
             ]
         case .ollama:
+            return []
+        case .openAICompatible:
+            // Driven by the user's local server's /v1/models response at runtime.
             return []
         }
     }

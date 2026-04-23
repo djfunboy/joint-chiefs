@@ -61,6 +61,18 @@ final class SetupModel {
     }
     var ollamaStatus: OllamaStatus = .unknown
 
+    // OpenAI-compatible (LM Studio, Jan, llama.cpp, etc.) test status. Same
+    // shape as OllamaStatus — the `.ok` payload is a human-readable summary
+    // (e.g. "LM Studio · 3 models") instead of a single model string, because
+    // /v1/models returns the full roster.
+    enum OpenAICompatibleStatus: Equatable {
+        case unknown
+        case testing
+        case ok(String)
+        case failed(String)
+    }
+    var openAICompatibleStatus: OpenAICompatibleStatus = .unknown
+
     /// Transient staging field — the user types into this, then the "Save" action
     /// writes to the Keychain via the keygetter and clears the field.
     var keyDrafts: [ProviderType: String] = [:]
@@ -202,6 +214,92 @@ final class SetupModel {
             ollamaStatus = ok ? .ok(strategy.ollama.model) : .failed("Server returned non-2xx")
         } catch {
             ollamaStatus = .failed(error.localizedDescription)
+        }
+    }
+
+    // OpenAI-compatible mutations — same immediate-persist pattern as Ollama.
+    func setOpenAICompatibleEnabled(_ enabled: Bool) {
+        strategy.openAICompatible.enabled = enabled
+        try? StrategyConfigStore.save(strategy)
+        strategyIsDirty = false
+    }
+
+    func setOpenAICompatibleEndpoint(_ endpoint: String) {
+        strategy.openAICompatible.endpoint = endpoint
+        try? StrategyConfigStore.save(strategy)
+        strategyIsDirty = false
+    }
+
+    func setOpenAICompatibleModel(_ model: String) {
+        strategy.openAICompatible.model = model
+        try? StrategyConfigStore.save(strategy)
+        strategyIsDirty = false
+    }
+
+    func setOpenAICompatibleAPIKey(_ key: String) {
+        strategy.openAICompatible.apiKey = key
+        try? StrategyConfigStore.save(strategy)
+        strategyIsDirty = false
+    }
+
+    func setOpenAICompatiblePreset(_ preset: String) {
+        strategy.openAICompatible.presetName = preset
+        // Pre-fill the endpoint when the user picks a known preset, but only
+        // if the field is empty or still holds another preset's default —
+        // don't clobber a hand-edited endpoint.
+        let presetDefaults: [String: String] = [
+            "LM Studio": "http://localhost:1234/v1",
+            "Jan": "http://localhost:1337/v1",
+            "llama.cpp": "http://localhost:8080/v1",
+        ]
+        let currentEndpoint = strategy.openAICompatible.endpoint
+        let isDefaultEndpoint = presetDefaults.values.contains(currentEndpoint) || currentEndpoint.isEmpty
+        if isDefaultEndpoint, let newDefault = presetDefaults[preset] {
+            strategy.openAICompatible.endpoint = newDefault
+        }
+        try? StrategyConfigStore.save(strategy)
+        strategyIsDirty = false
+    }
+
+    func testOpenAICompatibleConnection() async {
+        openAICompatibleStatus = .testing
+        let endpoint = strategy.openAICompatible.endpoint
+        guard let url = URL(string: endpoint) else {
+            openAICompatibleStatus = .failed("Invalid URL: \(endpoint)")
+            return
+        }
+        // Probe /v1/models directly — that's how clients discover what's
+        // loaded on LM Studio / Jan / llama.cpp. A 200 with a non-empty `data`
+        // array means the server is reachable and has at least one model.
+        let modelsURL = url.appendingPathComponent("models")
+        var request = URLRequest(url: modelsURL)
+        request.httpMethod = "GET"
+        let apiKey = strategy.openAICompatible.apiKey
+        if !apiKey.isEmpty {
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        }
+        request.timeoutInterval = TimeInterval(strategy.openAICompatible.timeoutSeconds)
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                openAICompatibleStatus = .failed("Non-HTTP response")
+                return
+            }
+            guard (200..<300).contains(http.statusCode) else {
+                openAICompatibleStatus = .failed("HTTP \(http.statusCode)")
+                return
+            }
+            // Parse model list loosely — { "data": [{"id": "..."}, ...] }
+            struct ModelListResponse: Decodable {
+                struct Entry: Decodable { let id: String }
+                let data: [Entry]
+            }
+            let parsed = try? JSONDecoder().decode(ModelListResponse.self, from: data)
+            let count = parsed?.data.count ?? 0
+            let presetName = strategy.openAICompatible.presetName
+            openAICompatibleStatus = .ok("\(presetName) · \(count) model\(count == 1 ? "" : "s")")
+        } catch {
+            openAICompatibleStatus = .failed(error.localizedDescription)
         }
     }
 
@@ -386,6 +484,11 @@ enum ProviderFactoryForSetup {
         case .anthropic:
             return AnthropicProvider(apiKey: apiKey, model: type.defaultModel)
         case .ollama:
+            return nil
+        case .openAICompatible:
+            // Tested via OpenAICompatibleCard's own Test button against the
+            // configured `/v1/models` endpoint — not through the generic
+            // Save/Test path other providers use.
             return nil
         }
     }

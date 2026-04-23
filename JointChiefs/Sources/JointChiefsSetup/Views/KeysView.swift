@@ -12,9 +12,12 @@ struct KeysView: View {
         ) {
             VStack(spacing: AgentSpacing.md) {
                 ForEach(ProviderType.allCases, id: \.self) { provider in
-                    if provider == .ollama {
+                    switch provider {
+                    case .ollama:
                         OllamaCard().environment(model)
-                    } else {
+                    case .openAICompatible:
+                        OpenAICompatibleCard().environment(model)
+                    default:
                         KeyRow(provider: provider)
                             .environment(model)
                     }
@@ -38,21 +41,23 @@ struct KeysView: View {
 /// setup doesn't require a web search mid-flow.
 private func consoleURL(for provider: ProviderType) -> URL? {
     switch provider {
-    case .openAI:    URL(string: "https://platform.openai.com/api-keys")
-    case .anthropic: URL(string: "https://console.anthropic.com/settings/keys")
-    case .gemini:    URL(string: "https://aistudio.google.com/apikey")
-    case .grok:      URL(string: "https://console.x.ai")
-    case .ollama:    URL(string: "https://ollama.com/download")
+    case .openAI:             URL(string: "https://platform.openai.com/api-keys")
+    case .anthropic:          URL(string: "https://console.anthropic.com/settings/keys")
+    case .gemini:             URL(string: "https://aistudio.google.com/apikey")
+    case .grok:               URL(string: "https://console.x.ai")
+    case .ollama:             URL(string: "https://ollama.com/download")
+    case .openAICompatible:   URL(string: "https://lmstudio.ai/")
     }
 }
 
 private func consoleLabel(for provider: ProviderType) -> String {
     switch provider {
-    case .openAI:    "OpenAI console"
-    case .anthropic: "Anthropic console"
-    case .gemini:    "Google AI Studio"
-    case .grok:      "xAI console"
-    case .ollama:    "ollama.com"
+    case .openAI:             "OpenAI console"
+    case .anthropic:          "Anthropic console"
+    case .gemini:             "Google AI Studio"
+    case .grok:               "xAI console"
+    case .ollama:             "ollama.com"
+    case .openAICompatible:   "lmstudio.ai"
     }
 }
 
@@ -174,6 +179,162 @@ private struct OllamaCard: View {
             AgentPill(text: message, kind: .error, icon: "exclamationmark.triangle.fill")
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("Ollama error: \(message)")
+        }
+    }
+}
+
+// MARK: - OpenAI-compatible card (LM Studio, Jan, llama.cpp-server, Msty, etc.)
+
+private struct OpenAICompatibleCard: View {
+
+    @Environment(SetupModel.self) private var model
+    @FocusState private var focusedField: Field?
+
+    private enum Field { case endpoint, modelName, apiKey }
+
+    private let presets = ["LM Studio", "Jan", "llama.cpp", "Custom"]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: AgentSpacing.md) {
+            HStack(alignment: .firstTextBaseline, spacing: AgentSpacing.sm) {
+                Text("LM Studio / Jan / llama.cpp")
+                    .font(.agentHumanName)
+                    .foregroundStyle(Color.agentTextPrimary)
+                ConsoleLink(provider: .openAICompatible)
+                Spacer()
+                statusBadge
+            }
+
+            Text("Point Joint Chiefs at any local inference server that speaks the OpenAI `/v1/chat/completions` protocol — LM Studio, Jan, llama.cpp-server, Msty, LocalAI. No API key required for most local setups. Nothing leaves your machine.")
+                .font(.agentSmall)
+                .foregroundStyle(Color.agentTextBody)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Toggle("Include local OpenAI-compatible server in the debate", isOn: Binding(
+                get: { model.strategy.openAICompatible.enabled },
+                set: { model.setOpenAICompatibleEnabled($0) }
+            ))
+            .font(.agentBody)
+            .foregroundStyle(Color.agentTextPrimary)
+            .tint(Color.agentBrandBlue)
+
+            if model.strategy.openAICompatible.enabled {
+                Rectangle()
+                    .fill(Color.agentBorder)
+                    .frame(height: 1)
+                    .accessibilityHidden(true)
+
+                // Preset chips — picking one pre-fills the endpoint to that
+                // server's default port, as long as the user hasn't hand-edited.
+                HStack(spacing: AgentSpacing.xs) {
+                    Text("Preset")
+                        .font(.agentBody)
+                        .foregroundStyle(Color.agentTextBody)
+                        .frame(width: 72, alignment: .leading)
+                    ForEach(presets, id: \.self) { preset in
+                        AgentChip(
+                            label: preset,
+                            isActive: model.strategy.openAICompatible.presetName == preset,
+                            action: { model.setOpenAICompatiblePreset(preset) }
+                        )
+                    }
+                    Spacer()
+                }
+
+                labeledField("Endpoint") {
+                    TextField(
+                        "",
+                        text: Binding(
+                            get: { model.strategy.openAICompatible.endpoint },
+                            set: { model.setOpenAICompatibleEndpoint($0) }
+                        ),
+                        prompt: Text("http://localhost:1234/v1").foregroundStyle(Color.agentTextMuted)
+                    )
+                    .focused($focusedField, equals: .endpoint)
+                    .agentInputStyle(focused: focusedField == .endpoint)
+                }
+
+                labeledField("Model") {
+                    TextField(
+                        "",
+                        text: Binding(
+                            get: { model.strategy.openAICompatible.model },
+                            set: { model.setOpenAICompatibleModel($0) }
+                        ),
+                        prompt: Text("exactly as it appears in /v1/models").foregroundStyle(Color.agentTextMuted)
+                    )
+                    .focused($focusedField, equals: .modelName)
+                    .agentInputStyle(focused: focusedField == .modelName)
+                }
+
+                labeledField("API key") {
+                    SecureField(
+                        "",
+                        text: Binding(
+                            get: { model.strategy.openAICompatible.apiKey },
+                            set: { model.setOpenAICompatibleAPIKey($0) }
+                        ),
+                        prompt: Text("usually blank for local servers").foregroundStyle(Color.agentTextMuted)
+                    )
+                    .focused($focusedField, equals: .apiKey)
+                    .agentInputStyle(focused: focusedField == .apiKey)
+                }
+
+                HStack {
+                    Spacer()
+                    Button("Test") {
+                        Task { await model.testOpenAICompatibleConnection() }
+                    }
+                    .buttonStyle(.agentSecondary(size: .small))
+                }
+
+                Text("Tip: make sure your server is running and that the Model name matches what it reports in `GET /v1/models` — the Test button hits that endpoint to verify.")
+                    .font(.agentXS)
+                    .foregroundStyle(Color.agentTextMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .agentPanel()
+    }
+
+    private func labeledField<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: AgentSpacing.sm) {
+            Text(title)
+                .font(.agentBody)
+                .foregroundStyle(Color.agentTextBody)
+                .frame(width: 72, alignment: .leading)
+            content()
+        }
+    }
+
+    @ViewBuilder
+    private var statusBadge: some View {
+        switch model.openAICompatibleStatus {
+        case .unknown:
+            if model.strategy.openAICompatible.enabled {
+                AgentPill(text: "untested", kind: .neutral)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("OpenAI-compatible server: enabled but untested")
+            } else {
+                AgentPill(text: "disabled", kind: .neutral)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("OpenAI-compatible server: disabled")
+            }
+        case .testing:
+            HStack(spacing: AgentSpacing.xs) {
+                ProgressView().controlSize(.small)
+                AgentPill(text: "testing…", kind: .warning)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("OpenAI-compatible server: testing")
+        case .ok(let summary):
+            AgentPill(text: summary, kind: .success, icon: "checkmark.circle.fill")
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("OpenAI-compatible server: \(summary)")
+        case .failed(let message):
+            AgentPill(text: message, kind: .error, icon: "exclamationmark.triangle.fill")
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("OpenAI-compatible server error: \(message)")
         }
     }
 }
@@ -349,6 +510,7 @@ private struct KeyRow: View {
         case .grok: "xAI Grok"
         case .anthropic: "Anthropic Claude"
         case .ollama: "Ollama"
+        case .openAICompatible: "OpenAI-compatible"
         }
     }
 
