@@ -84,7 +84,16 @@ Joint Chiefs/                          (github.com/djfunboy/joint-chiefs — pub
     └── lessons.md                     ← corrections log
 ```
 
-The website is a separate repo: **`djfunboy/joint-chiefs-website`** (private) → deployed to [jointchiefs.ai](https://jointchiefs.ai) via Netlify.
+## Repository Separation (important)
+
+Two distinct repos — never commingle. Don't copy website files into this repo, or vice versa. If you're unsure which repo a file belongs in, stop and ask.
+
+| Repo | Visibility | Remote | Checkout |
+|---|---|---|---|
+| **App** (this repo: `joint-chiefs`) | **PUBLIC** (MIT) | `github.com/djfunboy/joint-chiefs` | `~/Dropbox/Build/Joint Chiefs/` |
+| **Website** (`joint-chiefs-website`) | **PRIVATE** | `github.com/djfunboy/joint-chiefs-website` | `~/Dropbox/Build/Joint Chiefs Website/` |
+
+The website is deployed to [jointchiefs.ai](https://jointchiefs.ai) via Netlify — and deploys are **manual** (`netlify deploy --prod --dir .`), not git-triggered. A `git push` to the website repo alone does NOT update the live site.
 
 ## Key Patterns
 

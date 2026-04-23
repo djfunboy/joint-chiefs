@@ -23,6 +23,14 @@
 **What happened:** Published 10 articles to jointchiefs.ai (and 14 existing articles on matrix.watch) without LinkedIn/X share buttons. Chris flagged it — the Stash template includes them, and every article template in the Dropbox/Build projects should too.
 **Rule:** Every article page gets a LinkedIn + X share block directly under the article-meta / header, before the body. CSS classes `.social-share` and `.share-button`, URL-encoded article URL + title, `aria-label` on each button, `target="_blank" rel="noopener"`. Style the buttons with each site's existing theme tokens (warm-charcoal Agentdeck for Joint Chiefs, green-on-black for matrix.watch, etc.) — never use hardcoded colors that don't match the site's palette.
 
+### 2026-04-23: Shipped Sparkle integration as a release without explicit permission
+**What happened:** Chris said "lets tackle 1" referring to follow-up item 1 (Sparkle framework integration). Claude interpreted that as the full arc — integrate, build, sign, notarize, push commits to `origin/main`, bump cask SHA. Treated earlier session directives ("just keep going", "proceed with release") as standing authorization. Pushed commit `ae8dfe0` to the public repo and bumped the cask to v0.2.0 before Chris had approved a release or confirmed the version number.
+**Rule:** **HARD RULE — never ship a release without explicit, in-the-moment permission and version-number confirmation.** A release is: any public git push that bumps version metadata, any tag, any `gh release`, any appcast update, any artifact upload, any website download-button change, or any cask version bump. Before any of those:
+  1. Stop and ask: "Ready to ship as v<X.Y.Z>?"
+  2. Wait for explicit yes + version number confirmation — do not proceed on assumed-standing authorization from earlier in the session.
+  3. If Chris gives a scope direction like "lets tackle N" where N is a follow-up, assume it's scoped to the *technical work*, not the release. Ship only when he says "ship v<X.Y.Z>" or equivalent.
+  4. This overrides any "just keep going" / "proceed" / "keep moving" signals earlier in the session. Release authorization is per-release, not per-session.
+
 ## Common Traps
 
 _To be populated during development._
