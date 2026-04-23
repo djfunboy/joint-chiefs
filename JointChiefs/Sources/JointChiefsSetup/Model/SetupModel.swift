@@ -12,26 +12,26 @@ final class SetupModel {
     // MARK: - Navigation
 
     enum Section: String, CaseIterable, Identifiable {
-        case disclosure = "Data Handling"
+        case usage = "How to Use"
         case keys = "API Keys"
         case rolesWeights = "Roles & Weights"
         case mcp = "MCP Config"
-        case usage = "How to Use"
+        case disclosure = "Privacy"
 
         var id: String { rawValue }
 
         var systemImage: String {
             switch self {
-            case .disclosure: "lock.shield"
+            case .usage: "book.fill"
             case .keys: "key.fill"
             case .rolesWeights: "slider.horizontal.3"
             case .mcp: "puzzlepiece.extension.fill"
-            case .usage: "book.fill"
+            case .disclosure: "lock.shield"
             }
         }
     }
 
-    var currentSection: Section = .disclosure
+    var currentSection: Section = .usage
 
     // MARK: - Strategy (persisted)
 
@@ -121,6 +121,21 @@ final class SetupModel {
     func setWeight(_ value: Double, for provider: ProviderType) {
         strategy.providerWeights[provider] = value
         strategyIsDirty = true
+    }
+
+    /// Sets a user-specified model override for a provider. Auto-persists
+    /// (like Ollama fields) because users expect "typed a model → it applies
+    /// next review" — no hunting for a Save button. Empty strings remove the
+    /// override so ProviderFactory falls back to env var / default.
+    func setProviderModel(_ value: String, for provider: ProviderType) {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            strategy.providerModels.removeValue(forKey: provider)
+        } else {
+            strategy.providerModels[provider] = trimmed
+        }
+        try? StrategyConfigStore.save(strategy)
+        strategyIsDirty = false
     }
 
     func setModerator(_ selection: ModeratorSelection) {

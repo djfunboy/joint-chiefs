@@ -24,6 +24,12 @@ struct SetupApp: App {
                 .environment(model)
                 .environment(updater)
                 .frame(minWidth: 880, minHeight: 720)
+                // Agentdeck is a warm-charcoal dark-only palette. If the user's
+                // system is set to light, the native chrome (menu popovers,
+                // toggles, sliders, checkboxes) would fight our dark panels
+                // and some text would render unreadable. Forcing dark keeps
+                // the whole window consistent regardless of system setting.
+                .preferredColorScheme(.dark)
         }
         // Open wide enough to fit the Roles & Weights section without scroll
         // or sidebar truncation. `.contentMinSize` respects the declared

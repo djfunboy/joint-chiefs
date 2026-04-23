@@ -52,6 +52,18 @@ public struct StrategyConfig: Codable, Sendable, Equatable {
     /// the v1 behavior.
     public var providerWeights: [ProviderType: Double]
 
+    // MARK: - Per-Provider Model Selection
+
+    /// Override the default model string for a given provider (e.g. pick
+    /// `claude-sonnet-4-6` over `claude-opus-4-6`). Resolution priority in
+    /// `ProviderFactory`: `providerModels[type]` > env var (`OPENAI_MODEL`,
+    /// `ANTHROPIC_MODEL`, etc.) > `ProviderType.defaultModel`.
+    ///
+    /// Missing entries fall through to the next tier. Empty-string entries are
+    /// treated as missing so users can't accidentally lock a provider into a
+    /// blank model.
+    public var providerModels: [ProviderType: String]
+
     // MARK: - Local Models (Ollama)
 
     /// Configuration for the optional local Ollama general. When disabled, Ollama
@@ -76,6 +88,7 @@ public struct StrategyConfig: Codable, Sendable, Equatable {
         timeoutSeconds: 120,
         thresholdPercent: 0.66,
         providerWeights: [:],
+        providerModels: [:],
         ollama: .default,
         rateLimits: .default
     )
@@ -88,6 +101,7 @@ public struct StrategyConfig: Codable, Sendable, Equatable {
         timeoutSeconds: Int = 120,
         thresholdPercent: Double = 0.66,
         providerWeights: [ProviderType: Double] = [:],
+        providerModels: [ProviderType: String] = [:],
         ollama: OllamaConfig = .default,
         rateLimits: RateLimits = .default
     ) {
@@ -98,8 +112,17 @@ public struct StrategyConfig: Codable, Sendable, Equatable {
         self.timeoutSeconds = timeoutSeconds
         self.thresholdPercent = thresholdPercent
         self.providerWeights = providerWeights
+        self.providerModels = providerModels
         self.ollama = ollama
         self.rateLimits = rateLimits
+    }
+
+    /// Returns the user-configured model override for a provider, or nil if the
+    /// user hasn't set one. Empty strings return nil (treated as "not set").
+    /// `ProviderFactory` falls back to env var → default when this returns nil.
+    public func model(for provider: ProviderType) -> String? {
+        guard let value = providerModels[provider], !value.isEmpty else { return nil }
+        return value
     }
 
     /// Returns the configured weight for a provider, falling back to `1.0` when
@@ -121,7 +144,7 @@ extension StrategyConfig {
     // defaults so old configs still decode cleanly.
     private enum CodingKeys: String, CodingKey {
         case moderator, tiebreaker, consensus, maxRounds, timeoutSeconds
-        case thresholdPercent, providerWeights, ollama, rateLimits
+        case thresholdPercent, providerWeights, providerModels, ollama, rateLimits
     }
 
     public init(from decoder: Decoder) throws {
@@ -143,6 +166,17 @@ extension StrategyConfig {
             }
         }
         self.providerWeights = weights
+        // providerModels: same enum-keyed-dictionary treatment. Missing field
+        // in older strategy.json files decodes to an empty dict, which falls
+        // through to env var / default resolution — i.e. identical to v1 behavior.
+        let rawModels = try c.decodeIfPresent([String: String].self, forKey: .providerModels) ?? [:]
+        var models: [ProviderType: String] = [:]
+        for (rawKey, value) in rawModels {
+            if let type = ProviderType(rawValue: rawKey) {
+                models[type] = value
+            }
+        }
+        self.providerModels = models
         self.ollama = try c.decodeIfPresent(OllamaConfig.self, forKey: .ollama) ?? .default
         self.rateLimits = try c.decode(RateLimits.self, forKey: .rateLimits)
     }
@@ -161,6 +195,12 @@ extension StrategyConfig {
             rawWeights[type.rawValue] = value
         }
         try c.encode(rawWeights, forKey: .providerWeights)
+        // Same treatment for providerModels.
+        var rawModels: [String: String] = [:]
+        for (type, value) in providerModels {
+            rawModels[type.rawValue] = value
+        }
+        try c.encode(rawModels, forKey: .providerModels)
         try c.encode(ollama, forKey: .ollama)
         try c.encode(rateLimits, forKey: .rateLimits)
     }

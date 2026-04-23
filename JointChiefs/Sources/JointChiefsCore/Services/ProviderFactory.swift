@@ -29,6 +29,7 @@ public enum ProviderFactory {
     public static func buildPanel(
         resolveKey: (ProviderType) -> String?,
         weights: [ProviderType: Double]? = nil,
+        models: [ProviderType: String]? = nil,
         ollama: OllamaConfig? = nil,
         env: [String: String] = ProcessInfo.processInfo.environment
     ) -> [any ReviewProvider] {
@@ -40,33 +41,47 @@ public enum ProviderFactory {
             return weight <= 0
         }
 
+        // Model resolution priority per provider:
+        //   1. `models[type]` — user's StrategyConfig override (empty string ignored)
+        //   2. env var (OPENAI_MODEL, ANTHROPIC_MODEL, etc.) — CI / dev override
+        //   3. ProviderType.defaultModel — shipped default
+        func resolveModel(_ type: ProviderType, envKey: String) -> String {
+            if let override = models?[type], !override.isEmpty {
+                return override
+            }
+            if let envValue = env[envKey], !envValue.isEmpty {
+                return envValue
+            }
+            return type.defaultModel
+        }
+
         let session = HardenedURLSession.shared
 
         if !isExcluded(.openAI), let key = resolveKey(.openAI) {
             providers.append(OpenAIProvider(
                 apiKey: key,
-                model: env["OPENAI_MODEL"] ?? ProviderType.openAI.defaultModel,
+                model: resolveModel(.openAI, envKey: "OPENAI_MODEL"),
                 urlSession: session
             ))
         }
         if !isExcluded(.gemini), let key = resolveKey(.gemini) {
             providers.append(GeminiProvider(
                 apiKey: key,
-                model: env["GEMINI_MODEL"] ?? ProviderType.gemini.defaultModel,
+                model: resolveModel(.gemini, envKey: "GEMINI_MODEL"),
                 urlSession: session
             ))
         }
         if !isExcluded(.grok), let key = resolveKey(.grok) {
             providers.append(GrokProvider(
                 apiKey: key,
-                model: env["GROK_MODEL"] ?? ProviderType.grok.defaultModel,
+                model: resolveModel(.grok, envKey: "GROK_MODEL"),
                 urlSession: session
             ))
         }
         if !isExcluded(.anthropic), let key = resolveKey(.anthropic) {
             providers.append(AnthropicProvider(
                 apiKey: key,
-                model: env["ANTHROPIC_MODEL"] ?? ProviderType.anthropic.defaultModel,
+                model: resolveModel(.anthropic, envKey: "ANTHROPIC_MODEL"),
                 urlSession: session
             ))
         }
@@ -109,22 +124,39 @@ public enum ProviderFactory {
     public static func build(
         for selection: ModeratorSelection,
         resolveKey: (ProviderType) -> String?,
+        models: [ProviderType: String]? = nil,
         env: [String: String] = ProcessInfo.processInfo.environment
     ) -> (any ReviewProvider)? {
         guard let type = selection.providerType else { return nil }
         guard let key = resolveKey(type) else { return nil }
 
+        func resolveModel(_ type: ProviderType, envKey: String) -> String {
+            if let override = models?[type], !override.isEmpty {
+                return override
+            }
+            if let envValue = env[envKey], !envValue.isEmpty {
+                return envValue
+            }
+            return type.defaultModel
+        }
+
         let session = HardenedURLSession.shared
         switch type {
         case .openAI:
-            return OpenAIProvider(apiKey: key, model: env["OPENAI_MODEL"] ?? type.defaultModel, urlSession: session)
+            return OpenAIProvider(apiKey: key, model: resolveModel(.openAI, envKey: "OPENAI_MODEL"), urlSession: session)
         case .gemini:
-            return GeminiProvider(apiKey: key, model: env["GEMINI_MODEL"] ?? type.defaultModel, urlSession: session)
+            return GeminiProvider(apiKey: key, model: resolveModel(.gemini, envKey: "GEMINI_MODEL"), urlSession: session)
         case .grok:
-            return GrokProvider(apiKey: key, model: env["GROK_MODEL"] ?? type.defaultModel, urlSession: session)
+            return GrokProvider(apiKey: key, model: resolveModel(.grok, envKey: "GROK_MODEL"), urlSession: session)
         case .anthropic:
-            let model = env["CONSENSUS_MODEL"] ?? env["ANTHROPIC_MODEL"] ?? type.defaultModel
-            return AnthropicProvider(apiKey: key, model: model, urlSession: session)
+            // Anthropic resolution retains its special case: CONSENSUS_MODEL env
+            // var still takes precedence over the per-provider override here, so
+            // operators can split per-round Claude from the deciding Claude
+            // without touching their strategy.json.
+            if let consensus = env["CONSENSUS_MODEL"], !consensus.isEmpty {
+                return AnthropicProvider(apiKey: key, model: consensus, urlSession: session)
+            }
+            return AnthropicProvider(apiKey: key, model: resolveModel(.anthropic, envKey: "ANTHROPIC_MODEL"), urlSession: session)
         case .ollama:
             return nil
         }
@@ -137,13 +169,14 @@ public enum ProviderFactory {
     public static func buildTiebreaker(
         for selection: TiebreakerSelection,
         resolveKey: (ProviderType) -> String?,
+        models: [ProviderType: String]? = nil,
         env: [String: String] = ProcessInfo.processInfo.environment
     ) -> (any ReviewProvider)? {
         switch selection {
         case .sameAsModerator:
             return nil
         case .specific(let moderatorSelection):
-            return build(for: moderatorSelection, resolveKey: resolveKey, env: env)
+            return build(for: moderatorSelection, resolveKey: resolveKey, models: models, env: env)
         }
     }
 }

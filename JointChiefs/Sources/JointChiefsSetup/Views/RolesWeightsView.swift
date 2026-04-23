@@ -227,6 +227,11 @@ struct RolesWeightsView: View {
                 .accessibilityValue("\(model.strategy.maxRounds)")
             }
 
+            Text("More rounds means a more thorough review, but it takes longer and costs more. 1–2 is quick, 3–5 is typical, 6+ is deep-dive territory. Joint Chiefs stops early when the models agree.")
+                .font(.agentXS)
+                .foregroundStyle(Color.agentTextMuted)
+                .fixedSize(horizontal: false, vertical: true)
+
             HStack(spacing: AgentSpacing.md) {
                 Text("Timeout: \(model.strategy.timeoutSeconds)s")
                     .font(.agentBody.monospacedDigit())
@@ -245,6 +250,11 @@ struct RolesWeightsView: View {
                 .accessibilityLabel("Per-provider timeout in seconds")
                 .accessibilityValue("\(model.strategy.timeoutSeconds) seconds")
             }
+
+            Text("How long to wait for any single model before giving up on it. 120s works for most reviews. Bump higher if you see timeouts on big files.")
+                .font(.agentXS)
+                .foregroundStyle(Color.agentTextMuted)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .agentPanel()
     }

@@ -42,6 +42,7 @@ struct Review: AsyncParsableCommand {
         let strategyForPanel = StrategyConfigStore.load()
         let providers = buildProviders(
             weights: strategyForPanel.providerWeights,
+            models: strategyForPanel.providerModels,
             ollama: strategyForPanel.ollama
         )
 
@@ -57,8 +58,8 @@ struct Review: AsyncParsableCommand {
         if let rounds { strategy.maxRounds = rounds }
         if let timeout { strategy.timeoutSeconds = timeout }
 
-        let moderator = ProviderFactory.build(for: strategy.moderator, resolveKey: self.resolveKey)
-        let tiebreaker = ProviderFactory.buildTiebreaker(for: strategy.tiebreaker, resolveKey: self.resolveKey)
+        let moderator = ProviderFactory.build(for: strategy.moderator, resolveKey: self.resolveKey, models: strategy.providerModels)
+        let tiebreaker = ProviderFactory.buildTiebreaker(for: strategy.tiebreaker, resolveKey: self.resolveKey, models: strategy.providerModels)
 
         let orchestrator = try DebateOrchestrator(
             providers: providers,
@@ -264,8 +265,8 @@ struct Review: AsyncParsableCommand {
 
     // MARK: - Provider Setup
 
-    private func buildProviders(weights: [ProviderType: Double], ollama: OllamaConfig) -> [any ReviewProvider] {
-        ProviderFactory.buildPanel(resolveKey: self.resolveKey, weights: weights, ollama: ollama)
+    private func buildProviders(weights: [ProviderType: Double], models: [ProviderType: String], ollama: OllamaConfig) -> [any ReviewProvider] {
+        ProviderFactory.buildPanel(resolveKey: self.resolveKey, weights: weights, models: models, ollama: ollama)
     }
 
     /// Env var → keygetter → nil. Surfaces keygetter errors to the user; silent

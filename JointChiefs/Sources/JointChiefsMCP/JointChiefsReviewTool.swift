@@ -122,6 +122,7 @@ enum JointChiefsReviewTool {
         let providers = ProviderFactory.buildPanel(
             resolveKey: resolveKey,
             weights: strategy.providerWeights,
+            models: strategy.providerModels,
             ollama: strategy.ollama
         )
         guard !providers.isEmpty else {
@@ -136,8 +137,8 @@ enum JointChiefsReviewTool {
             strategy.maxRounds = max(0, min(strategy.maxRounds, 10))
         }
 
-        let moderator = ProviderFactory.build(for: strategy.moderator, resolveKey: resolveKey)
-        let tiebreaker = ProviderFactory.buildTiebreaker(for: strategy.tiebreaker, resolveKey: resolveKey)
+        let moderator = ProviderFactory.build(for: strategy.moderator, resolveKey: resolveKey, models: strategy.providerModels)
+        let tiebreaker = ProviderFactory.buildTiebreaker(for: strategy.tiebreaker, resolveKey: resolveKey, models: strategy.providerModels)
 
         let orchestrator: DebateOrchestrator
         do {

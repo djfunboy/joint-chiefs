@@ -152,8 +152,12 @@ private struct OllamaCard: View {
         case .unknown:
             if model.strategy.ollama.enabled {
                 AgentPill(text: "untested", kind: .neutral)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Ollama: enabled but untested")
             } else {
                 AgentPill(text: "disabled", kind: .neutral)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Ollama: disabled")
             }
         case .testing:
             HStack(spacing: AgentSpacing.xs) {
@@ -164,9 +168,11 @@ private struct OllamaCard: View {
             .accessibilityLabel("Ollama connection: testing")
         case .ok(let m):
             AgentPill(text: "\(m) reachable", kind: .success, icon: "checkmark.circle.fill")
+                .accessibilityElement(children: .combine)
                 .accessibilityLabel("Ollama: \(m) reachable")
         case .failed(let message):
             AgentPill(text: message, kind: .error, icon: "exclamationmark.triangle.fill")
+                .accessibilityElement(children: .combine)
                 .accessibilityLabel("Ollama error: \(message)")
         }
     }
@@ -180,10 +186,13 @@ private struct KeyRow: View {
 
     @Environment(SetupModel.self) private var model
     @State private var localDraft: String = ""
-    @FocusState private var isFocused: Bool
+    @FocusState private var focusedField: Field?
+
+    private enum Field { case key }
 
     var body: some View {
         VStack(alignment: .leading, spacing: AgentSpacing.sm) {
+            // Top row: provider name + console link + status pill.
             HStack(spacing: AgentSpacing.sm) {
                 Text(providerDisplayName)
                     .font(.agentHumanName)
@@ -191,47 +200,146 @@ private struct KeyRow: View {
                 ConsoleLink(provider: provider)
                 statusBadge
                 Spacer()
-                if case .saved = model.keyStatuses[provider] {
-                    Button("Delete") {
-                        Task { await model.deleteKey(for: provider) }
-                    }
-                    .buttonStyle(.agentDanger)
-                }
             }
 
+            // Key row — always visible. Empty SecureField for pasting when no
+            // key is saved; a masked dot display when a key is already on file.
+            // Right-hand action buttons change with state.
             HStack(spacing: AgentSpacing.sm) {
-                SecureField(
-                    "",
-                    text: $localDraft,
-                    prompt: Text("Paste API key").foregroundStyle(Color.agentTextMuted)
-                )
-                .focused($isFocused)
-                .agentInputStyle(focused: isFocused)
-
-                Button("Save") {
-                    let toSave = localDraft
-                    Task {
-                        await model.saveKey(toSave, for: provider)
-                        localDraft = ""
-                    }
+                if hasSavedKey {
+                    maskedKeyDisplay
+                } else {
+                    SecureField(
+                        "",
+                        text: $localDraft,
+                        prompt: Text("Paste API key").foregroundStyle(Color.agentTextMuted)
+                    )
+                    .focused($focusedField, equals: .key)
+                    .agentInputStyle(focused: focusedField == .key)
+                    .accessibilityLabel("\(providerDisplayName) API key")
                 }
-                .buttonStyle(.agentPrimary(size: .small))
-                .disabled(localDraft.isEmpty)
 
-                Button("Test") {
-                    Task { await model.testKey(for: provider) }
-                }
-                .buttonStyle(.agentSecondary(size: .small))
-                .disabled(!canTest)
+                actionButtons
             }
 
-            if let hint = hintText {
-                Text(hint)
-                    .font(.agentXS)
-                    .foregroundStyle(Color.agentTextMuted)
+            // Model row — native Menu popover over the top-5 curated list.
+            // Auto-saves on selection. `Menu` gives explicit control over the
+            // label appearance; `Picker(.menu)` sometimes swallows taps inside
+            // custom-styled panels on macOS.
+            HStack(alignment: .firstTextBaseline, spacing: AgentSpacing.sm) {
+                Text("Model")
+                    .font(.agentSmall)
+                    .foregroundStyle(Color.agentTextBody)
+                    .frame(width: 64, alignment: .leading)
+                Menu {
+                    ForEach(provider.availableModels, id: \.self) { modelName in
+                        Button {
+                            model.setProviderModel(modelName, for: provider)
+                        } label: {
+                            if modelName == currentModel {
+                                Label(modelLabel(modelName), systemImage: "checkmark")
+                            } else {
+                                Text(modelLabel(modelName))
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: AgentSpacing.xs) {
+                        Text(modelLabel(currentModel))
+                            .font(.agentSmall)
+                            .foregroundStyle(Color.agentTextPrimary)
+                            .lineLimit(1)
+                        Spacer()
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Color.agentTextBody)
+                    }
+                    .agentInputStyle(focused: false)
+                    .contentShape(Rectangle())
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .accessibilityLabel("\(providerDisplayName) model")
+                .accessibilityValue(currentModel)
             }
         }
         .agentPanel()
+    }
+
+    /// The model currently applied for this provider — the user's saved
+    /// override if set, otherwise the shipped default.
+    private var currentModel: String {
+        model.strategy.providerModels[provider] ?? provider.defaultModel
+    }
+
+    /// Appends a "(default)" tag to the default model so users know which one
+    /// ships out of the box without having to read docs.
+    private func modelLabel(_ modelName: String) -> String {
+        modelName == provider.defaultModel
+            ? "\(modelName) (default)"
+            : modelName
+    }
+
+    /// True when the Keychain has a key for this provider — regardless of
+    /// whether it's been tested. Drives the masked-dots vs paste-field toggle.
+    private var hasSavedKey: Bool {
+        switch model.keyStatuses[provider] {
+        case .saved, .ok, .testing, .failed: true
+        case .unconfigured, .none: false
+        }
+    }
+
+    /// Read-only styled row of bullet dots standing in for the stored key.
+    /// Fixed dot count — doesn't leak actual key length, but long enough to
+    /// look like a real key (OpenAI `sk-proj-` keys run ~160 chars; Anthropic
+    /// `sk-ant-` keys run ~108; Gemini ~40; Grok ~84). 48 is comfortable
+    /// middle ground that reads as "long hidden string" without padding past
+    /// the input field's visible width.
+    private var maskedKeyDisplay: some View {
+        Text(String(repeating: "•", count: 48))
+            .font(.agentBody)
+            .foregroundStyle(Color.agentTextBody)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .agentInputStyle(focused: false)
+            .accessibilityLabel("\(providerDisplayName) key stored")
+            .accessibilityValue("hidden")
+    }
+
+    /// Action buttons to the right of the key field. Contents depend on state
+    /// so the user never sees a disabled button for something they can't do
+    /// yet (e.g. Test before Save, Delete when nothing is stored).
+    @ViewBuilder
+    private var actionButtons: some View {
+        switch model.keyStatuses[provider] {
+        case .unconfigured, .none:
+            Button("Save") {
+                let toSave = localDraft
+                Task {
+                    await model.saveKey(toSave, for: provider)
+                    localDraft = ""
+                }
+            }
+            .buttonStyle(.agentPrimary(size: .small))
+            .disabled(localDraft.isEmpty)
+        case .saved, .failed:
+            Button("Test") {
+                Task { await model.testKey(for: provider) }
+            }
+            .buttonStyle(.agentSecondary(size: .small))
+            Button("Delete") {
+                Task { await model.deleteKey(for: provider) }
+            }
+            .buttonStyle(.agentDanger)
+        case .ok:
+            Button("Delete") {
+                Task { await model.deleteKey(for: provider) }
+            }
+            .buttonStyle(.agentDanger)
+        case .testing:
+            EmptyView()
+        }
     }
 
     private var providerDisplayName: String {
@@ -244,31 +352,16 @@ private struct KeyRow: View {
         }
     }
 
-    private var hintText: String? {
-        switch provider {
-        case .openAI: "Starts with sk-…"
-        case .gemini: "From Google AI Studio"
-        case .grok: "From console.x.ai"
-        case .anthropic: "Starts with sk-ant-… — also used as the default moderator"
-        case .ollama: nil
-        }
-    }
-
-    private var canTest: Bool {
-        switch model.keyStatuses[provider] {
-        case .saved, .ok, .failed: true
-        default: false
-        }
-    }
-
     @ViewBuilder
     private var statusBadge: some View {
         switch model.keyStatuses[provider] {
         case .unconfigured, .none:
             AgentPill(text: "not set", kind: .neutral)
+                .accessibilityElement(children: .combine)
                 .accessibilityLabel("\(providerDisplayName) key: not set")
         case .saved:
             AgentPill(text: "saved", kind: .success, icon: "lock.fill")
+                .accessibilityElement(children: .combine)
                 .accessibilityLabel("\(providerDisplayName) key: saved in Keychain")
         case .testing:
             HStack(spacing: AgentSpacing.xs) {
@@ -279,9 +372,11 @@ private struct KeyRow: View {
             .accessibilityLabel("\(providerDisplayName) key: testing")
         case .ok(let model):
             AgentPill(text: "\(model) OK", kind: .success, icon: "checkmark.circle.fill")
+                .accessibilityElement(children: .combine)
                 .accessibilityLabel("\(providerDisplayName) key tested OK on \(model)")
         case .failed(let message):
             AgentPill(text: message, kind: .error, icon: "exclamationmark.triangle.fill")
+                .accessibilityElement(children: .combine)
                 .accessibilityLabel("\(providerDisplayName) key error: \(message)")
         }
     }

@@ -1,11 +1,12 @@
 import AppKit
 import SwiftUI
 
-/// Final step of the setup wizard. Once the plumbing is done, the user
-/// needs to know how to prompt Joint Chiefs well — which is a skill most
-/// developers don't have on day one. This view teaches the three-part
-/// prompt (what / goal / scale) and gives concrete AI-client and terminal
-/// invocations they can copy.
+/// First screen of the setup wizard. Orients the user to what Joint Chiefs
+/// actually is — a panel of LLMs that debate a code review and produce one
+/// consensus summary — and shows exactly how to invoke it from a terminal
+/// or any AI client with MCP configured. Setup screens (Keys / Roles / MCP
+/// Config) follow; Data Handling closes the flow for the users who want the
+/// full threat model before they ship a review.
 struct UsageView: View {
 
     @Environment(SetupModel.self) private var model
@@ -15,73 +16,104 @@ struct UsageView: View {
     var body: some View {
         SetupPage(
             title: "How to Use",
-            subtitle: "Joint Chiefs gives better reviews when you give it better prompts. Three dimensions matter every time."
+            subtitle: "Joint Chiefs gets multiple LLMs debating your code, project, or files to surface the insights and direction you need to make the right call."
         ) {
             VStack(alignment: .leading, spacing: AgentSpacing.lg) {
-                successPanel
+                introPanel
+                invocationPanel
                 threePartPanel
                 examplesPanel
-                invocationPanel
             }
         } footer: {
-            Button("Close Setup") {
-                NSApp.keyWindow?.performClose(nil)
+            Button("Next — Add API Keys") {
+                model.currentSection = .keys
             }
             .buttonStyle(.agentPrimary)
             .keyboardShortcut(.defaultAction)
-            .accessibilityHint("Closes the Joint Chiefs Setup window and quits the app")
+            .accessibilityHint("Moves to the API Keys step of the setup wizard")
         }
     }
 
-    // MARK: - Success affordance
+    // MARK: - Intro — what the app actually is
 
-    private var successPanel: some View {
-        HStack(alignment: .top, spacing: AgentSpacing.sm) {
-            Image(systemName: "checkmark.seal.fill")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.agentSuccess)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: AgentSpacing.xxs) {
-                Text("Setup is done")
+    private var introPanel: some View {
+        VStack(alignment: .leading, spacing: AgentSpacing.md) {
+            HStack(alignment: .firstTextBaseline, spacing: AgentSpacing.sm) {
+                AgentSectionHeader(text: "What it does")
+                Spacer()
+                openSourceLink
+            }
+
+            VStack(alignment: .leading, spacing: AgentSpacing.sm) {
+                Text("Joint Chiefs pulls multiple AI models into a review of your code, project, or files — OpenAI, Gemini, Grok, Claude, and optionally a local model via Ollama. You pick which ones participate. They each weigh in, see each other's feedback, and either push back or revise. The moderator pulls out what matters: the insights and direction you need to decide what to do next.")
                     .font(.agentBody)
-                    .foregroundStyle(Color.agentTextPrimary)
-                Text("The rest of this page is optional reading, but it's the difference between Joint Chiefs giving you boilerplate feedback and giving you review notes worth acting on.")
-                    .font(.agentSmall)
+                    .foregroundStyle(Color.agentTextBody)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text("Multiple models beat one. Each has different blind spots and different priors. The positions that survive the debate are the ones worth trusting — sharper architecture calls, real issues surfaced, better judgment on what to fix first.")
+                    .font(.agentBody)
+                    .foregroundStyle(Color.agentTextBody)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text("Run it from your AI coding assistant or the terminal. Nothing leaves your machine except the code you explicitly ask it to review.")
+                    .font(.agentBody)
                     .foregroundStyle(Color.agentTextBody)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer(minLength: 0)
         }
-        .agentPanel(tint: Color.agentBgReady)
-        .accessibilityElement(children: .combine)
+        .agentPanel()
+    }
+
+    /// Small trust signal — Joint Chiefs is MIT-licensed and the source is
+    /// public. Link sits in the intro panel header so it's visible at the
+    /// first screen without taking space from body copy.
+    @ViewBuilder
+    private var openSourceLink: some View {
+        if let url = URL(string: "https://github.com/djfunboy/joint-chiefs") {
+            Link(destination: url) {
+                HStack(spacing: AgentSpacing.xxs) {
+                    Text("Open source")
+                        .font(.agentXS)
+                    Image(systemName: "arrow.up.right.square")
+                        .font(.system(size: 10, weight: .medium))
+                }
+                .foregroundStyle(Color.agentTextAccent)
+                .padding(.vertical, AgentSpacing.xxs)
+                .padding(.horizontal, AgentSpacing.xs)
+                .overlay(
+                    RoundedRectangle(cornerRadius: AgentRadius.xs)
+                        .strokeBorder(Color.agentBorderMuted, lineWidth: 1)
+                )
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("View Joint Chiefs source on GitHub")
+        }
     }
 
     // MARK: - Three-part prompt
 
     private var threePartPanel: some View {
         VStack(alignment: .leading, spacing: AgentSpacing.md) {
-            AgentSectionHeader(text: "Three dimensions")
+            AgentSectionHeader(text: "Three things to tell Joint Chiefs")
 
             dimensionRow(
                 label: "WHAT",
-                title: "The code",
-                body: "A file path, a git diff, or a paste. Keep it focused — the tighter the input, the sharper the feedback."
+                body: "A file, a function, or pasted code. Tighter is better — keep it focused."
             )
             dimensionRow(
                 label: "GOAL",
-                title: "The lens",
-                body: "Security. Correctness. Performance. Readability. Pick one. Without a lens, every model falls back on style nits."
+                body: "What should it look for? Bugs, security, performance, readability — pick one. Without this, every review comes back generic."
             )
             dimensionRow(
-                label: "SCALE",
-                title: "The context",
-                body: "Who this code serves, at what scale, under what constraints. A null check that's fine for 100 internal users is a priority-1 defect on a 10M-user public API. Tell Joint Chiefs the scale and it prioritizes accordingly."
+                label: "CONTEXT",
+                body: "Who's using it and at what scale. A quirk that's fine for a side project might be a real problem on a public app. The more context you give, the sharper the review."
             )
         }
         .agentPanel()
     }
 
-    private func dimensionRow(label: String, title: String, body: String) -> some View {
+    private func dimensionRow(label: String, body: String) -> some View {
         HStack(alignment: .top, spacing: AgentSpacing.md) {
             Text(label)
                 .font(.agentPanelHeader)
@@ -89,15 +121,11 @@ struct UsageView: View {
                 .foregroundStyle(Color.agentTextAccent)
                 .frame(width: 72, alignment: .leading)
                 .accessibilityAddTraits(.isHeader)
-            VStack(alignment: .leading, spacing: AgentSpacing.xxs) {
-                Text(title)
-                    .font(.agentBody)
-                    .foregroundStyle(Color.agentTextPrimary)
-                Text(body)
-                    .font(.agentSmall)
-                    .foregroundStyle(Color.agentTextBody)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            Text(body)
+                .font(.agentSmall)
+                .foregroundStyle(Color.agentTextBody)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -109,17 +137,11 @@ struct UsageView: View {
 
             exampleRow(
                 kind: .weak,
-                code: "Review this code."
+                code: "Have Joint Chiefs review this code."
             )
             exampleRow(
                 kind: .strong,
-                code: """
-                Run a Joint Chiefs review on src/pricing.ts.
-                Goal: correctness.
-                Scale: billing math for a B2B SaaS with 500 enterprise
-                customers — false charges trigger legal exposure.
-                Prioritize edge cases over style.
-                """
+                code: "Have Joint Chiefs review my checkout flow. Look for bugs and edge cases — specifically anything that'd break if a user refreshes mid-purchase. It's for a small side project with a few hundred users."
             )
         }
         .agentPanel()
@@ -159,82 +181,94 @@ struct UsageView: View {
 
     private var invocationPanel: some View {
         VStack(alignment: .leading, spacing: AgentSpacing.md) {
-            AgentSectionHeader(text: "Where to run it")
+            AgentSectionHeader(text: "Two ways to call it — pick whichever fits")
 
             VStack(alignment: .leading, spacing: AgentSpacing.xs) {
-                Text("From any AI client with MCP configured")
-                    .font(.agentBody)
-                    .foregroundStyle(Color.agentTextPrimary)
-                Text("Write the prompt in natural language. The AI invokes `joint_chiefs_review` for you.")
-                    .font(.agentSmall)
-                    .foregroundStyle(Color.agentTextBody)
-                codeFrame(
-                    code: aiSnippet,
-                    copied: copiedAiSnippet,
-                    onCopy: {
+                HStack {
+                    Text("From your AI coding assistant")
+                        .font(.agentBody)
+                        .foregroundStyle(Color.agentTextPrimary)
+                    Spacer()
+                    Button(copiedAiSnippet ? "Copied" : "Copy") {
                         copyToPasteboard(aiSnippet)
                         copiedAiSnippet = true
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { copiedAiSnippet = false }
                     }
-                )
-            }
-
-            Rectangle()
-                .fill(Color.agentBorder)
-                .frame(height: 1)
-                .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: AgentSpacing.xs) {
-                Text("From your terminal")
-                    .font(.agentBody)
-                    .foregroundStyle(Color.agentTextPrimary)
-                Text("Use `--goal` and `--context` to encode the lens and scale. Skip them and every review comes out generic.")
+                    .buttonStyle(.agentGhost)
+                    .accessibilityLabel(copiedAiSnippet ? "Copied" : "Copy snippet")
+                }
+                Text("Say **\"Joint Chiefs\"** in your prompt. That tells your AI to call the Joint Chiefs MCP, which runs the multi-model review and hands the consensus back to you.")
                     .font(.agentSmall)
                     .foregroundStyle(Color.agentTextBody)
-                codeFrame(
-                    code: cliSnippet,
-                    copied: copiedCliSnippet,
-                    onCopy: {
+                    .fixedSize(horizontal: false, vertical: true)
+                codeFrame(code: aiSnippet)
+            }
+
+            orDivider
+
+            VStack(alignment: .leading, spacing: AgentSpacing.xs) {
+                HStack {
+                    Text("From your terminal")
+                        .font(.agentBody)
+                        .foregroundStyle(Color.agentTextPrimary)
+                    Spacer()
+                    Button(copiedCliSnippet ? "Copied" : "Copy") {
                         copyToPasteboard(cliSnippet)
                         copiedCliSnippet = true
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { copiedCliSnippet = false }
                     }
-                )
+                    .buttonStyle(.agentGhost)
+                    .accessibilityLabel(copiedCliSnippet ? "Copied" : "Copy snippet")
+                }
+                Text("If you're comfortable in a terminal, you can call it directly. Use `--goal` and `--context` to tell Joint Chiefs what to look for.")
+                    .font(.agentSmall)
+                    .foregroundStyle(Color.agentTextBody)
+                    .fixedSize(horizontal: false, vertical: true)
+                codeFrame(code: cliSnippet)
             }
         }
         .agentPanel()
     }
 
+    private var orDivider: some View {
+        HStack(spacing: AgentSpacing.sm) {
+            Rectangle()
+                .fill(Color.agentBorder)
+                .frame(height: 1)
+            Text("OR")
+                .font(.agentPanelHeader)
+                .agentUppercaseCaption()
+                .foregroundStyle(Color.agentTextAccent)
+            Rectangle()
+                .fill(Color.agentBorder)
+                .frame(height: 1)
+        }
+        .padding(.vertical, AgentSpacing.xs)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("or")
+    }
+
     // MARK: - Code frame
 
     @ViewBuilder
-    private func codeFrame(code: String, copied: Bool = false, onCopy: (() -> Void)? = nil) -> some View {
-        ZStack(alignment: .topTrailing) {
-            ScrollView {
-                Text(code)
-                    .font(.agentSmall)
-                    .foregroundStyle(Color.agentTextPrimary)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(AgentSpacing.md)
-            }
-            .frame(maxHeight: 180)
-            .background(
-                RoundedRectangle(cornerRadius: AgentRadius.md)
-                    .fill(Color.agentBgCode)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: AgentRadius.md)
-                    .strokeBorder(Color.agentBorder, lineWidth: 1)
-            )
-
-            if let onCopy {
-                Button(copied ? "Copied" : "Copy") { onCopy() }
-                    .buttonStyle(.agentGhost)
-                    .padding(AgentSpacing.xs)
-                    .accessibilityLabel(copied ? "Copied" : "Copy snippet")
-            }
+    private func codeFrame(code: String) -> some View {
+        ScrollView {
+            Text(code)
+                .font(.agentSmall)
+                .foregroundStyle(Color.agentTextPrimary)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(AgentSpacing.md)
         }
+        .frame(maxHeight: 180)
+        .background(
+            RoundedRectangle(cornerRadius: AgentRadius.md)
+                .fill(Color.agentBgCode)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: AgentRadius.md)
+                .strokeBorder(Color.agentBorder, lineWidth: 1)
+        )
     }
 
     private func copyToPasteboard(_ s: String) {
@@ -246,21 +280,14 @@ struct UsageView: View {
     // MARK: - Snippet content
 
     private var aiSnippet: String {
-        """
-        Run a Joint Chiefs review on src/auth.swift.
-        Goal: security audit.
-        Scale: consumer API, ~2M daily active users,
-        must meet SOC 2 requirements.
-        Focus on credential handling, session lifetimes,
-        and OWASP Top 10 exposure.
-        """
+        "Have Joint Chiefs review my login page. Check for bugs and common security mistakes — it's for a small side project I'm about to share with friends."
     }
 
     private var cliSnippet: String {
         """
-        jointchiefs review src/auth.swift \\
-            --goal "security audit" \\
-            --context "Consumer API, 2M DAU, SOC 2 target"
+        jointchiefs review src/login.ts \\
+            --goal "bugs and basic security" \\
+            --context "Side project, small user base"
         """
     }
 }

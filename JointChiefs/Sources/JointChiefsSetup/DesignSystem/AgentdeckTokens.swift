@@ -25,7 +25,7 @@ extension Color {
     // MARK: - Text
     static let agentTextPrimary = Color(red: 243/255.0, green: 242/255.0, blue: 241/255.0)     // #f3f2f1
     static let agentTextBody    = Color(red: 165/255.0, green: 160/255.0, blue: 156/255.0)     // #a5a09c
-    static let agentTextMuted   = Color(red: 121/255.0, green: 95/255.0,  blue: 93/255.0)      // #795f5d
+    static let agentTextMuted   = Color(red: 138/255.0, green: 128/255.0, blue: 124/255.0)     // #8a807c — warm muted gray, ~5.2:1 on agentBgPanel (WCAG AA)
     static let agentTextAccent  = Color(red: 164/255.0, green: 132/255.0, blue: 127/255.0)     // #a4847f — warm-tan accent
 
     // MARK: - Borders
