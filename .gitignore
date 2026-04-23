@@ -22,3 +22,6 @@ build/
 
 # Stale review outputs and scratch
 tasks/jc-review-result.md
+
+# Session handoff docs — kept local, never committed to the public repo
+tasks/SESSION-HANDOFF-*.md
