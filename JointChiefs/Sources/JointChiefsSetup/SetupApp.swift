@@ -16,11 +16,13 @@ struct SetupApp: App {
 
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var model = SetupModel()
+    @State private var updater = UpdaterService()
 
     var body: some Scene {
         Window("Joint Chiefs Setup", id: "setup") {
             RootView()
                 .environment(model)
+                .environment(updater)
                 .frame(minWidth: 880, minHeight: 720)
         }
         // Open wide enough to fit the Roles & Weights section without scroll
@@ -29,6 +31,15 @@ struct SetupApp: App {
         // interacts badly with `Spacer()`-driven layouts).
         .defaultSize(width: 980, height: 780)
         .windowResizability(.contentMinSize)
+        .commands {
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") {
+                    updater.checkForUpdates()
+                }
+                .disabled(!updater.canCheckForUpdates)
+                .keyboardShortcut("u", modifiers: [.command])
+            }
+        }
     }
 }
 

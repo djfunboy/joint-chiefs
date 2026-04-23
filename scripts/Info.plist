@@ -36,5 +36,15 @@
     <false/>
     <key>NSHumanReadableCopyright</key>
     <string>Open-source under the MIT License.</string>
+    <key>SUFeedURL</key>
+    <string>https://jointchiefs.ai/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>hCjq+Dd+6wMPsMBcij/G+ASqfrm6U3aFWcxnjxO0lSY=</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUScheduledCheckInterval</key>
+    <integer>86400</integer>
+    <key>SUAllowsAutomaticUpdates</key>
+    <true/>
 </dict>
 </plist>

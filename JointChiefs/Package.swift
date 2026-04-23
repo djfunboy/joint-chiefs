@@ -14,7 +14,8 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
-        .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", exact: "0.12.0")
+        .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", exact: "0.12.0"),
+        .package(url: "https://github.com/sparkle-project/Sparkle.git", from: "2.9.0")
     ],
     targets: [
         .target(
@@ -44,7 +45,10 @@ let package = Package(
         ),
         .executableTarget(
             name: "JointChiefsSetup",
-            dependencies: ["JointChiefsCore"],
+            dependencies: [
+                "JointChiefsCore",
+                .product(name: "Sparkle", package: "Sparkle")
+            ],
             path: "Sources/JointChiefsSetup"
         ),
         .testTarget(

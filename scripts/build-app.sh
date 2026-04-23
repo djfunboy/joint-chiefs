@@ -63,6 +63,21 @@ for name in jointchiefs jointchiefs-mcp jointchiefs-keygetter; do
     chmod 0755 "$APP_PATH/Contents/Resources/$name"
 done
 
+# Sparkle.framework ships as a binary XCFramework via SPM. The .framework on
+# disk after `swift build` already contains XPCServices, the Autoupdate helper,
+# and the Updater.app helper — we just need to mirror it into Contents/Frameworks/.
+# Copy with -R to preserve symlinks (Versions/Current -> B).
+SPARKLE_SRC="$BIN_DIR/Sparkle.framework"
+if [[ -d "$SPARKLE_SRC" ]]; then
+    echo "==> Copying Sparkle.framework into Contents/Frameworks"
+    mkdir -p "$APP_PATH/Contents/Frameworks"
+    rm -rf "$APP_PATH/Contents/Frameworks/Sparkle.framework"
+    cp -R "$SPARKLE_SRC" "$APP_PATH/Contents/Frameworks/Sparkle.framework"
+else
+    echo "error: Sparkle.framework not found at $SPARKLE_SRC" >&2
+    exit 1
+fi
+
 ICON_SRC="$REPO_ROOT/Resources/AppIcon.icns"
 if [[ -f "$ICON_SRC" ]]; then
     echo "==> Copying AppIcon.icns into Contents/Resources"
