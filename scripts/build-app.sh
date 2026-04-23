@@ -78,6 +78,15 @@ else
     exit 1
 fi
 
+# Sparkle's install name is @rpath/Sparkle.framework/..., and SPM doesn't add an
+# rpath entry pointing at the bundle's Contents/Frameworks/. Without this, the
+# app launches, dyld fails to find Sparkle, and macOS silently falls back to
+# any other Joint Chiefs.app it can find (e.g. an older /Applications copy).
+# Patch the main executable's rpath so the framework loads from the bundle.
+echo "==> Patching Sparkle rpath on main executable"
+install_name_tool -add_rpath "@executable_path/../Frameworks" \
+    "$APP_PATH/Contents/MacOS/jointchiefs-setup"
+
 ICON_SRC="$REPO_ROOT/Resources/AppIcon.icns"
 if [[ -f "$ICON_SRC" ]]; then
     echo "==> Copying AppIcon.icns into Contents/Resources"
