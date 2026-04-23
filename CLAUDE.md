@@ -93,7 +93,7 @@ Two distinct repos — never commingle. Don't copy website files into this repo,
 | **App** (this repo: `joint-chiefs`) | **PUBLIC** (MIT) | `github.com/djfunboy/joint-chiefs` | `~/Dropbox/Build/Joint Chiefs/` |
 | **Website** (`joint-chiefs-website`) | **PRIVATE** | `github.com/djfunboy/joint-chiefs-website` | `~/Dropbox/Build/Joint Chiefs Website/` |
 
-The website is deployed to [jointchiefs.ai](https://jointchiefs.ai) via Netlify — and deploys are **manual** (`netlify deploy --prod --dir .`), not git-triggered. A `git push` to the website repo alone does NOT update the live site.
+The website is deployed to [jointchiefs.ai](https://jointchiefs.ai) via Netlify. **Auto-deploy is wired** — every `git push origin main` on the website repo triggers a Netlify build + deploy. No manual step.
 
 ## Key Patterns
 
