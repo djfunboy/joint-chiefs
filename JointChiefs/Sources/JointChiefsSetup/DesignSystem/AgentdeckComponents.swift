@@ -177,15 +177,19 @@ struct AgentPill: View {
     let text: String
     var kind: Kind = .neutral
     var icon: String? = nil
+    /// Compact variant shrinks the type to `agentXS` (11pt) and the icon to
+    /// 9pt, matching the surrounding scale when the pill sits next to small
+    /// labels (e.g. the sidebar update-status footer).
+    var compact: Bool = false
 
     var body: some View {
         HStack(spacing: AgentSpacing.xs) {
             if let icon {
                 Image(systemName: icon)
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: compact ? 9 : 10, weight: .semibold))
             }
             Text(text)
-                .font(.agentSmall.weight(.semibold))
+                .font((compact ? Font.agentXS : Font.agentSmall).weight(.semibold))
         }
         .foregroundStyle(foreground)
         .padding(.vertical, AgentSpacing.xxs)

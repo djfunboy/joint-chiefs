@@ -49,6 +49,7 @@ struct RootView: View {
 private struct Sidebar: View {
 
     @Environment(SetupModel.self) private var model
+    @Environment(UpdaterService.self) private var updater
 
     var body: some View {
         VStack(alignment: .leading, spacing: AgentSpacing.xxs) {
@@ -66,6 +67,88 @@ private struct Sidebar: View {
             }
 
             Spacer(minLength: 0)
+
+            UpdateStatusFooter()
+                .environment(updater)
+        }
+    }
+}
+
+/// Pinned to the bottom of the sidebar. Shows the running app version and
+/// either a "Check for updates" action or an "Update available → install"
+/// action when Sparkle's scheduled check has discovered a newer release.
+/// Tapping either path calls `updater.checkForUpdates()`, which presents
+/// Sparkle's standard UI — "No new version available" or the install prompt.
+private struct UpdateStatusFooter: View {
+
+    @Environment(UpdaterService.self) private var updater
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: AgentSpacing.xs) {
+            Rectangle()
+                .fill(Color.agentBorder)
+                .frame(height: 1)
+                .accessibilityHidden(true)
+                .padding(.horizontal, AgentSpacing.md)
+
+            if let pendingVersion = updater.availableUpdateVersion {
+                // Update discovered by a background check — highlight it.
+                // `.info` (blue), not `.success` (green): per the design
+                // system, green is reserved for validated/ready states.
+                // An "update available" notification is informational.
+                Button {
+                    updater.checkForUpdates()
+                } label: {
+                    HStack(spacing: AgentSpacing.xs) {
+                        AgentPill(text: "update available", kind: .info, icon: "arrow.up.circle.fill", compact: true)
+                        Text("v\(pendingVersion)")
+                            .font(.agentXS)
+                            .foregroundStyle(Color.agentTextBody)
+                        Spacer()
+                    }
+                    .padding(.horizontal, AgentSpacing.md)
+                    .padding(.vertical, AgentSpacing.xs)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Update available to version \(pendingVersion). Click to install.")
+            } else {
+                Button {
+                    updater.checkForUpdates()
+                } label: {
+                    HStack(spacing: AgentSpacing.xs) {
+                        if updater.isChecking {
+                            ProgressView()
+                                .controlSize(.mini)
+                                .accessibilityHidden(true)
+                            Text("Checking…")
+                                .font(.agentXS)
+                                .foregroundStyle(Color.agentTextBody)
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.agentXS)
+                                .foregroundStyle(Color.agentTextBody)
+                            Text("Check for updates")
+                                .font(.agentXS)
+                                .foregroundStyle(Color.agentTextBody)
+                        }
+                        Spacer()
+                    }
+                    .padding(.horizontal, AgentSpacing.md)
+                    .padding(.vertical, AgentSpacing.xs)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(!updater.canCheckForUpdates || updater.isChecking)
+                .accessibilityLabel(updater.isChecking ? "Checking for updates" : "Check for updates")
+            }
+
+            Text("v\(updater.currentVersion)")
+                .font(.agentXS)
+                .foregroundStyle(Color.agentTextMuted)
+                .padding(.horizontal, AgentSpacing.md)
+                .padding(.bottom, AgentSpacing.sm)
+                .accessibilityLabel("Current version \(updater.currentVersion)")
         }
     }
 }

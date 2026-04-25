@@ -23,32 +23,74 @@ final class UpdaterService {
     /// installing). Always `false` when running outside an app bundle.
     var canCheckForUpdates: Bool = false
 
+    /// True between a user-triggered `checkForUpdates()` call and Sparkle
+    /// reporting back (via the `canCheckForUpdates` KVO transition to `true`).
+    /// Drives the inline spinner in the sidebar footer so a slow network check
+    /// doesn't look like a dead button.
+    var isChecking: Bool = false
+
+    /// The version string of an update Sparkle's background check has
+    /// discovered but the user hasn't installed yet. `nil` when nothing's
+    /// pending. Drives the "update available" badge in the sidebar footer.
+    /// Cleared on every `checkForUpdates()` call so a dismissed install modal
+    /// doesn't leave the badge stuck — Sparkle re-fires `didFindValidUpdate`
+    /// on the next discovery if the update is still pending.
+    var availableUpdateVersion: String? = nil
+
+    /// The currently running app version (CFBundleShortVersionString), or
+    /// `"dev"` when running outside a bundle. Shown in the sidebar footer.
+    let currentVersion: String
+
     private let controller: SPUStandardUpdaterController?
+    private let delegate: UpdaterDelegate?
     private var observation: NSKeyValueObservation?
 
     init() {
+        self.currentVersion = Self.readBundleVersion()
         guard Self.isRunningFromAppBundle else {
             self.controller = nil
+            self.delegate = nil
             return
         }
+        let delegate = UpdaterDelegate()
         let c = SPUStandardUpdaterController(
             startingUpdater: true,
-            updaterDelegate: nil,
+            updaterDelegate: delegate,
             userDriverDelegate: nil
         )
         self.controller = c
+        self.delegate = delegate
         self.canCheckForUpdates = c.updater.canCheckForUpdates
+        // Capture the update version whenever Sparkle discovers one — via
+        // scheduled background check OR the user's manual `checkForUpdates`
+        // call. The sidebar footer then renders the "update available" badge
+        // until the install modal is acted on. Resets to nil aren't wired —
+        // the modal is the resolution path, and the next check refreshes state.
+        delegate.onUpdateFound = { [weak self] version in
+            Task { @MainActor [weak self] in
+                self?.availableUpdateVersion = version
+            }
+        }
         self.observation = c.updater.observe(\.canCheckForUpdates, options: [.new]) { [weak self] updater, _ in
             Task { @MainActor [weak self] in
-                self?.canCheckForUpdates = updater.canCheckForUpdates
+                guard let self else { return }
+                self.canCheckForUpdates = updater.canCheckForUpdates
+                if updater.canCheckForUpdates, self.isChecking {
+                    self.isChecking = false
+                }
             }
         }
     }
 
     /// User-triggered update check. Presents Sparkle's standard UI on any
     /// outcome — found, not found, error. No-op in dev (no controller).
+    /// Clears any stale "update available" state so a dismissed install modal
+    /// doesn't leave the footer stuck on the previous version.
     func checkForUpdates() {
-        controller?.checkForUpdates(nil)
+        guard let controller else { return }
+        availableUpdateVersion = nil
+        isChecking = true
+        controller.checkForUpdates(nil)
     }
 
     /// Dev builds run under `swift run` — the executable sits directly in
@@ -57,5 +99,20 @@ final class UpdaterService {
     /// `Bundle.main.bundlePath` points at the `.app`.
     private static var isRunningFromAppBundle: Bool {
         Bundle.main.bundlePath.hasSuffix(".app")
+    }
+
+    private static func readBundleVersion() -> String {
+        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "dev"
+    }
+}
+
+/// Bridges Sparkle's Objective-C delegate callback into our @Observable model.
+/// Held strongly by `UpdaterService` so the controller's weak delegate
+/// reference stays alive for the lifetime of the app.
+private final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {
+    var onUpdateFound: ((String) -> Void)?
+
+    func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
+        onUpdateFound?(item.displayVersionString)
     }
 }
