@@ -220,7 +220,7 @@ struct UsageView: View {
                     .buttonStyle(.agentGhost)
                     .accessibilityLabel(copiedCliSnippet ? "Copied" : "Copy snippet")
                 }
-                Text("If you're comfortable in a terminal, you can call it directly. Use `--goal` and `--context` to tell Joint Chiefs what to look for.")
+                Text("If you're comfortable in a terminal, you can call it directly. The `--goal` and `--context` flags are optional — add them when you want to focus the review.")
                     .font(.agentSmall)
                     .foregroundStyle(Color.agentTextBody)
                     .fixedSize(horizontal: false, vertical: true)

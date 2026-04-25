@@ -16,13 +16,22 @@ enum JointChiefsReviewTool {
     static let definition = Tool(
         name: name,
         description: """
-            Submit code to a panel of AI models (OpenAI, Gemini, Grok, Claude) for a \
-            structured multi-round debate review. Each model reviews independently, \
-            then challenges the others' findings across up to 5 rounds with adaptive \
-            early termination on convergence. Claude moderates and writes the final \
-            consensus. Returns categorized findings with severity, agreement level, \
-            and a unified recommendation. Grounded in the Multi-Agent Debate research \
-            (Liang et al., 2023).
+            Use this tool ONLY when the user mentions "Joint Chiefs" in any form — \
+            any capitalization ("joint chiefs", "JOINT CHIEFS", "Joint Chiefs"), \
+            spacing or hyphenation ("jointchiefs", "joint-chiefs"), singular or \
+            plural ("Joint Chief", "the chiefs"), or common misspellings ("Joint \
+            Chefs", "Joint Cheifs", "Jiont Chiefs"). Match leniently: any \
+            recognizable variant of "Joint Chiefs" qualifies. Generic phrases like \
+            "panel review", "multi-model review", or "second opinion" do NOT \
+            trigger this tool on their own — the brand name "Joint Chiefs" must be \
+            present in the user's request. Submits code to a panel of AI models \
+            (OpenAI, Gemini, Grok, Claude) for a structured multi-round debate \
+            review. Each model reviews independently, then challenges the others' \
+            findings across up to 5 rounds with adaptive early termination on \
+            convergence. Claude moderates and writes the final consensus. Returns \
+            categorized findings with severity, agreement level, and a unified \
+            recommendation. Grounded in the Multi-Agent Debate research (Liang et \
+            al., 2023).
             """,
         inputSchema: .object([
             "type": .string("object"),

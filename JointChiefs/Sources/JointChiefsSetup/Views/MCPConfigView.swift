@@ -17,6 +17,7 @@ struct MCPConfigView: View {
                 aiPromptPanel
                 jsonConfigPanel
                 verificationPanel
+                troubleshootingFooter
             }
         } footer: {
             Button("Next: How to Use") {
@@ -140,6 +141,23 @@ struct MCPConfigView: View {
         .agentPanel()
     }
 
+    // MARK: - Troubleshooting
+
+    private var troubleshootingFooter: some View {
+        HStack {
+            Spacer()
+            Link(destination: URL(string: "https://jointchiefs.ai/setup-guide.md")!) {
+                Text("Didn't work? See setup guide →")
+                    .font(.agentXS)
+                    .foregroundStyle(Color.agentTextAccent)
+                    .underline()
+            }
+            .accessibilityLabel("Open troubleshooting page")
+            Spacer()
+        }
+        .padding(.top, AgentSpacing.xs)
+    }
+
     // MARK: - Verification
 
     private var verificationPanel: some View {
@@ -194,11 +212,23 @@ struct MCPConfigView: View {
     /// listing config-file paths since they differ per client.
     private var aiPrompt: String {
         """
-        Please add the Joint Chiefs MCP server to your config. The command is:
+        Please wire up the Joint Chiefs MCP server so I can use it from this session, then run a quick test to confirm it's actually working. Don't stop at "I added the entry" — go all the way to a working tool call.
+
+        The command path is:
 
         \(mcpBinaryPath)
 
-        Find your MCP config file (it's a JSON file on my machine — the location depends on which client you are), add a new entry under "mcpServers" named "joint-chiefs" with that command, then tell me if I need to restart anything for it to take effect.
+        Do this:
+
+        1. Find your own MCP config file. The JSON path depends on which AI assistant you are — figure out your own path; don't ask me.
+        2. Add a new entry under "mcpServers" named "joint-chiefs" pointing at that command. No API keys go in here — Joint Chiefs reads them from the macOS Keychain at request time.
+        3. Show me the exact entry you wrote so I can verify it landed.
+        4. Tell me whether anything (you, the host app, etc.) needs to restart for the new server to load. If it does, walk me through the restart.
+        5. After the restart, confirm you can see the `joint_chiefs_review` tool in your tool list. Then call it on a tiny snippet (5–10 lines of any code is fine) and show me the consensus output as proof it's wired end-to-end.
+
+        End the conversation by either confirming "Joint Chiefs is wired up and working" with the test output, or telling me the specific blocker you hit. Do not leave me guessing whether it worked.
+
+        If you get stuck at any step — config file you can't locate, server not appearing after restart, the test tool call returning an error — fetch https://jointchiefs.ai/setup-guide.md and follow the troubleshooting steps there before giving up.
         """
     }
 

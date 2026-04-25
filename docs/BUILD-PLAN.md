@@ -1,7 +1,7 @@
 # Joint Chiefs — Build Plan
 
-**Version:** 1.4
-**Last Updated:** 2026-04-20
+**Version:** 1.5
+**Last Updated:** 2026-04-25
 
 ## What's Built
 
@@ -248,7 +248,7 @@ app runs from the bundle, and via flat-sibling when it runs from
 
 ---
 
-## Phase 10: Security & Distribution 🟡 IN PROGRESS
+## Phase 10: Security & Distribution 🟢 COMPLETE
 
 **Goal:** Sign, notarize, and auto-update. Match the security baseline of
 Chris's other 10 apps (Apple Developer ID + notarization + Sparkle).
@@ -262,13 +262,13 @@ reversed in favor of the standard Apple Developer flow.
 2. ✅ `jointchiefs-keygetter` target building and producing expected exit codes
 3. ✅ Public repo shipped — `github.com/djfunboy/joint-chiefs` (MIT)
 4. ✅ Website shipped — `jointchiefs.ai` live via Netlify, custom domain + SSL configured; source in private `djfunboy/joint-chiefs-website` repo
-5. [ ] Release signing script: sign `jointchiefs`, `jointchiefs-mcp`, `jointchiefs-keygetter` with Developer ID; keygetter with `--identifier com.jointchiefs.keygetter`
-6. [ ] Notarization workflow
-7. [ ] DMG artifact with app bundle + CLIs in `Contents/Resources/`
-8. [ ] Sparkle integration (populate appcast.xml on jointchiefs.ai with first notarized release)
-9. [ ] URLSession redirect-authorization-stripping delegate (shared across providers)
-10. [ ] MCP rate limiting (1 concurrent, 30/hour, cancel on stdin close)
-11. [ ] SECURITY.md written
+5. ✅ Release signing — `scripts/build-app.sh` signs `jointchiefs-setup`, `jointchiefs`, `jointchiefs-mcp`, `jointchiefs-keygetter` with Developer ID; keygetter with `--identifier com.jointchiefs.keygetter` per the Keychain-ACL design
+6. ✅ Notarization workflow — DMGs notarized + stapled since v0.1.0
+7. ✅ DMG artifact — `Joint-Chiefs.dmg` shipped for v0.1.0 through v0.4.0 with app bundle + CLI binaries in `Contents/Resources/`
+8. ✅ Sparkle integration — wired in v0.2.0 (commit `ae8dfe0`); v0.3.1 hotfix landed `install_name_tool` rpath patch in `scripts/build-app.sh` to fix the dyld-resolution failure that crashed v0.2.0 + v0.3.0 on cold-machine launch
+9. ✅ URLSession redirect-authorization-stripping delegate — shared across providers (commit `57f7c7e`)
+10. ✅ MCP rate limiting — 1 concurrent, 30/hour cap, cancel on stdin close (commit `57f7c7e`)
+11. ✅ `SECURITY.md` written and shipped at repo root
 12. ✅ Open-source README restructured for four surfaces (CLI, MCP, setup, keygetter)
 
 ---
@@ -289,3 +289,4 @@ reversed in favor of the standard Apple Developer flow.
 | 1.2 | 2026-04-18 | v2 scope: Phase 6 (setup app) and Phase 8 (MCP server) moved to in-progress. Added Phase 10 (security & distribution) with the lean security baseline. "What's Built" now lists keygetter + APIKeyResolver + StrategyConfig/Store + MCP server scaffold. Test count updated to 52. |
 | 1.3 | 2026-04-19 | Phase 6 steps 5-10 complete: `jointchiefs-setup` SwiftUI target scaffolded with Disclosure / Keys / Roles-&-Weights / Install / MCP-Config screens. `StrategyConfig.providerWeights` added — 0 excludes a provider from the panel, positive values drive weighted voting in `.votingThreshold` mode. `APIKeyResolver` gained `writeViaKeygetter` / `deleteViaKeygetter`. `ReviewProvider.providerType` added so the orchestrator can resolve per-provider weight from a provider instance. Test count 52 → 60. Phase 9 step 1 checkpoint updated. |
 | 1.4 | 2026-04-20 | Phase 6 step 11 complete: all five setup-app views migrated to Agentdeck tokens. `AgentdeckComponents.swift` added — `AgentInputStyle`, `agentPanel`, `AgentPill`, `AgentChip`, `AgentSectionHeader`. Phase 10 steps 3–4 complete: public app repo live at `github.com/djfunboy/joint-chiefs`, website shipped to `jointchiefs.ai` via Netlify (custom domain + SSL). Phase 9 step 6 complete: README + CLAUDE.md + all docs synced to four-surface reality and current test counts. Phase 9 checkpoint test count corrected 52 → 60. |
+| 1.5 | 2026-04-25 | Phase 10 marked 🟢 COMPLETE — steps 5–11 reconciled with shipping reality (signing, notarization, DMG, Sparkle, redirect-stripping, MCP rate limits, SECURITY.md all landed across v0.1.0–v0.4.0). Sparkle integration note expanded to call out the v0.3.1 rpath hotfix that fixed the dyld-resolution failure in v0.2.0 + v0.3.0 cold-machine launches. |

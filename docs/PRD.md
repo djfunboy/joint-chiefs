@@ -1,7 +1,7 @@
 # Joint Chiefs — Product Requirements Document
 
-**Version:** 1.3
-**Last Updated:** 2026-04-20
+**Version:** 1.4
+**Last Updated:** 2026-04-25
 
 **Website:** [jointchiefs.ai](https://jointchiefs.ai/) (live)
 **Repository:** [github.com/djfunboy/joint-chiefs](https://github.com/djfunboy/joint-chiefs) (public, MIT)
@@ -18,12 +18,12 @@ Solo developers using AI coding assistants get a single model's perspective on c
 
 ### Solution
 
-Joint Chiefs is a macOS menu bar app that:
-1. Runs a local server accepting review requests from any LLM CLI
-2. Dispatches code to multiple configured LLM providers in parallel
-3. Runs structured debate rounds where models see and challenge each other's findings
+Joint Chiefs is a four-surface product (CLI + stdio MCP server + macOS setup app + signed Keychain keygetter) that:
+1. Exposes an MCP server (`jointchiefs-mcp`) any MCP-aware client can spawn over stdio, so the host LLM calls `joint_chiefs_review` like any other tool
+2. Dispatches code to multiple configured LLM providers in parallel via `TaskGroup`
+3. Runs structured debate rounds where models see anonymized prior findings and challenge each other
 4. Synthesizes consensus into a concise summary returned to the caller
-5. Stores full debate transcripts for browsing in the app
+5. Writes full debate transcripts to local files for replay or pipeline inspection
 
 ### Business Model
 
@@ -69,7 +69,7 @@ CLI tool installed at `/opt/homebrew/bin/jointchiefs` (Apple Silicon Macs only).
 - [x] CLI tool: `jointchiefs review <path> [--goal "..."] [--context "..."]`
 - [x] Streaming SSE output: tokens appear live in the terminal
 - [x] Exit code 0 on success, 1 on failure
-- [ ] HTTP API / MCP wrapper — deferred with menu bar app
+- [x] MCP server (`jointchiefs-mcp`) shipped — see F9 / Phase 8. HTTP API remains deferred (Phase 4); stdio-only MCP makes it unnecessary.
 
 ### F5: macOS Menu Bar App — DEFERRED
 CLI-only works fine for solo use. Revisit if a GUI becomes necessary.
@@ -101,20 +101,21 @@ Local transcript files written to disk. A UI for browsing them is deferred with 
 ### Performance
 - Initial review dispatch: < 2s from request to first API call
 - Total review cycle (2 rounds, 3 models): < 90s typical
-- Menu bar app memory: < 100MB idle
-- Local server response: < 100ms overhead (excluding LLM latency)
+- Setup app idle memory: < 100MB
+- MCP tool-call overhead: < 100ms before the orchestrator dispatches (excludes LLM latency)
 
 ### Reliability
-- Server auto-restarts on crash
-- Graceful handling of provider timeouts and errors
-- Transcript storage survives app restarts (SwiftData persistence)
+- Graceful handling of provider timeouts and errors — orchestrator continues with remaining providers if one fails mid-round
+- Transcript files written to local disk; reviews survive setup-app restarts because nothing in the review path runs in the setup app
+- MCP server is stdio-only and stateless across invocations — no server process to crash; the host LLM owns the lifecycle
 - No data loss on unexpected quit
 
 ### Security
-- API keys stored in macOS Keychain, not plaintext
-- Local server binds to localhost only (not exposed to network)
+- API keys stored in macOS Keychain, accessed exclusively by the signed `jointchiefs-keygetter` binary
+- MCP server is stdio-only — no listening ports, no network transports (architecturally prohibited)
+- CLI calls the orchestrator directly — no local HTTP server, no port binds
 - No telemetry, no external connections except configured LLM APIs
-- Code sent for review is not stored beyond the transcript
+- Code sent for review is not cached beyond the local transcript file
 
 ## User Flows
 
@@ -169,3 +170,4 @@ Local transcript files written to disk. A UI for browsing them is deferred with 
 | 1.1 | 2026-04-09 | Updated F1-F8 status (F1-F4 DONE, F5-F7 DEFERRED, F8 PARTIAL); rewrote Flow 1 to reflect CLI build/install process; rewrote Flow 2 to show streaming output; dropped Flow 3 (menu bar app deferred) |
 | 1.2 | 2026-04-19 | F6 (Setup App) promoted from DEFERRED to DONE (scaffold) — `jointchiefs-setup` ships Disclosure/Keys/Roles-&-Weights/Install/MCP-Config sections; per-provider weighting (0 excludes, >1 amplifies voting weight) landed in `StrategyConfig`. Bundle wrapping + accessibility pass remain tracked in Phases 9 and 10. |
 | 1.3 | 2026-04-20 | Added website + repository references to the header. F6 updated to reflect the Agentdeck design-system migration landing across all five views — `AgentInputStyle`, `agentPanel`, `AgentPill`, `AgentChip`, `AgentSectionHeader` shipped as reusable components in `JointChiefsSetup/DesignSystem/AgentdeckComponents.swift`. |
+| 1.4 | 2026-04-25 | Reconciled local-server contradictions. Solution rewritten around the four-surface MCP-first product. F4's MCP-wrapper bullet flipped to ✅ (shipped via Phase 8). Technical Requirements rewritten — removed "local server response" / "server auto-restarts" / "binds to localhost" lines; replaced with stdio-MCP-aware reliability + security text. |
