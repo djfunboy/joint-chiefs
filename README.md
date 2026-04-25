@@ -184,7 +184,7 @@ CLI flags:
 
 ```bash
 cd JointChiefs
-swift test          # 60 tests
+swift test          # 80 tests
 swift build -c release
 ```
 

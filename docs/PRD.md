@@ -1,6 +1,6 @@
 # Joint Chiefs — Product Requirements Document
 
-**Version:** 1.4
+**Version:** 1.5
 **Last Updated:** 2026-04-25
 
 **Website:** [jointchiefs.ai](https://jointchiefs.ai/) (live)
@@ -74,7 +74,7 @@ CLI tool installed at `/opt/homebrew/bin/jointchiefs` (Apple Silicon Macs only).
 ### F5: macOS Menu Bar App — DEFERRED
 CLI-only works fine for solo use. Revisit if a GUI becomes necessary.
 
-### F6: Setup App — DONE (scaffold + design-system migration)
+### F6: Setup App — DONE
 Single-window SwiftUI executable (`jointchiefs-setup`) that ships alongside
 the CLI and MCP server. Five sections:
 - [x] Data-handling disclosure (first-run)
@@ -83,7 +83,9 @@ the CLI and MCP server. Five sections:
 - [x] Install screen — Homebrew/`~/.local/bin`/custom destination, PATH detection, copies the three binaries
 - [x] MCP config snippet — keyless JSON, Copy button
 - [x] All five views migrated to Agentdeck design tokens (no hex/CGFloat literals in any view); new design-system components: `AgentInputStyle`, `agentPanel`, `AgentPill`, `AgentChip`, `AgentSectionHeader`
-- [ ] Bundled in `Joint Chiefs.app` with `Contents/Resources/` binaries (tracked in Phase 10)
+- [x] Bundled in `Joint Chiefs.app` with `Contents/Resources/` binaries — DMGs notarized + stapled through v0.4.0
+- [x] **"Configured AI tools" panel (v0.5.0)** — `MCPConfigScanner` walks home-dir conventional config locations (top-level dotfiles, `~/.<dir>/<file>`, `~/.config/<dir>/<file>`, `~/Library/Application Support/<dir>/<sub>/<file>`), structurally confirms each MCP-server stanza, and reports per-tool wire-up status with a "wired in M of N" pill. Detection is by stanza shape, never by client name.
+- [x] **Sidebar update-status footer (v0.5.0)** — currently-running version + Sparkle-driven "Check for updates" / "update available" affordance with inline spinner during user-triggered checks.
 - [ ] VoiceOver + Dynamic Type pass (tracked in Phase 9)
 
 ### F7: Transcript Viewer — DEFERRED
@@ -171,3 +173,4 @@ Local transcript files written to disk. A UI for browsing them is deferred with 
 | 1.2 | 2026-04-19 | F6 (Setup App) promoted from DEFERRED to DONE (scaffold) — `jointchiefs-setup` ships Disclosure/Keys/Roles-&-Weights/Install/MCP-Config sections; per-provider weighting (0 excludes, >1 amplifies voting weight) landed in `StrategyConfig`. Bundle wrapping + accessibility pass remain tracked in Phases 9 and 10. |
 | 1.3 | 2026-04-20 | Added website + repository references to the header. F6 updated to reflect the Agentdeck design-system migration landing across all five views — `AgentInputStyle`, `agentPanel`, `AgentPill`, `AgentChip`, `AgentSectionHeader` shipped as reusable components in `JointChiefsSetup/DesignSystem/AgentdeckComponents.swift`. |
 | 1.4 | 2026-04-25 | Reconciled local-server contradictions. Solution rewritten around the four-surface MCP-first product. F4's MCP-wrapper bullet flipped to ✅ (shipped via Phase 8). Technical Requirements rewritten — removed "local server response" / "server auto-restarts" / "binds to localhost" lines; replaced with stdio-MCP-aware reliability + security text. |
+| 1.5 | 2026-04-25 | F6 promoted from "DONE (scaffold)" to plain DONE — bundle + DMG checkbox flipped from `[ ]` → `[x]` (DMGs notarized + stapled through v0.4.0). Added two v0.5.0 checkboxes: the "Configured AI tools" panel surfacing per-tool MCP wire-up status, and the sidebar update-status footer. |

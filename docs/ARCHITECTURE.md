@@ -1,7 +1,7 @@
 # Joint Chiefs — Architecture
 
-**Version:** 1.4
-**Last Updated:** 2026-04-20
+**Version:** 1.5
+**Last Updated:** 2026-04-25
 
 **Website:** [jointchiefs.ai](https://jointchiefs.ai/) — deployed via Netlify. Source in the private `djfunboy/joint-chiefs-website` repo.
 **App repo:** [github.com/djfunboy/joint-chiefs](https://github.com/djfunboy/joint-chiefs) (public, MIT).
@@ -64,19 +64,20 @@ fallback if Claude is unavailable.
 
 | Layer | Technology | Purpose |
 |---|---|---|
-| App framework | SwiftUI | Menu bar app, settings, transcript viewer |
-| HTTP server | Deferred — CLI direct call works for solo use | No local server needed today |
+| Setup app | SwiftUI + `@Observable` (Agentdeck design system) | One-shot installer for keys, strategy, MCP config, CLI install |
 | CLI | Swift ArgumentParser | `jointchiefs` command-line tool |
-| Persistence | SwiftData | Settings, transcripts, provider configs |
-| Secrets | macOS Keychain | API key storage |
+| MCP server | `modelcontextprotocol/swift-sdk` 0.12.0 (stdio transport) | `jointchiefs-mcp` exposes `joint_chiefs_review` |
+| Keychain | Single signed binary (`jointchiefs-keygetter`) | Sole identity authorized to read/write Joint Chiefs Keychain items |
+| Persistence | `StrategyConfig` JSON + local transcript files | `~/Library/Application Support/Joint Chiefs/strategy.json` (mode 0600). SwiftData reserved for the deferred menu bar app (PRD F5) |
+| Secrets | macOS Keychain (via keygetter) | API key storage |
 | Networking | URLSession | LLM API calls |
-| API Calls | URLSession.bytes (SSE streaming) | Stream LLM responses, no timeouts |
-| MCP (optional) | stdio wrapper | Native integration with any MCP client |
-| Minimum target | macOS 15 | @Observable, SwiftData |
+| API Calls | `URLSession.bytes` (SSE streaming) | Stream LLM responses, no timeouts |
+| Auto-update | Sparkle 2.x (app bundle only) | Bundled CLI + MCP binaries re-installed via setup app on update |
+| Minimum target | macOS 15 (Apple Silicon only) | `@Observable` macro |
 
 ## Project Structure
 
-Only what currently exists in the repo. The setup app is deferred.
+Reflects the four-surface product as it currently ships.
 
 ```
 JointChiefs/
@@ -128,12 +129,12 @@ All providers conform to this protocol. Each provider:
 The core engine. Manages the full review lifecycle:
 
 1. **Parallel Review Phase:** Sends code to all configured providers simultaneously via `TaskGroup`. Each returns independent findings.
-2. **Debate Rounds:** For each round (configurable, default 2):
+2. **Debate Rounds:** For each round (configurable, default 5 with adaptive early-break on convergence):
    - Sends all prior findings to each provider
    - Each provider can agree, disagree, revise, or raise new findings
    - Tracks position changes across rounds
-3. **Consensus Phase:** Passes all findings + debate history to `ConsensusBuilder`, which produces the final `ConsensusSummary`.
-4. **Storage:** Saves full `DebateTranscript` to SwiftData. Returns only `ConsensusSummary` to caller.
+3. **Consensus Phase:** Passes all findings + debate history to the moderator (Claude by default) via one of four `ConsensusMode`s — `moderatorDecides`, `strictMajority`, `bestOfAll`, `votingThreshold` — producing the final `ConsensusSummary`. `ConsensusBuilder` provides a code-based fallback.
+4. **Storage:** Persists full `DebateTranscript` to local files under the user's caches. Returns only `ConsensusSummary` to caller.
 
 ### CLI Tool
 
@@ -231,7 +232,7 @@ Exit code contract (callers depend on these):
 ## Data Flow
 
 ```
-1. Request arrives (CLI or HTTP)
+1. Request arrives (CLI invocation or MCP tool call)
          │
 2. DebateOrchestrator.startReview()
          │
@@ -259,7 +260,7 @@ Exit code contract (callers depend on these):
    │             │
    ▼             ▼
 Summary      Transcript
-(returned)   (stored in SwiftData)
+(returned)   (written to local file)
 ```
 
 ## Debate Methodology
@@ -405,3 +406,4 @@ Claude model for per-round reviews and a larger one for the final call.
 | 1.2 | 2026-04-18 | v2 scope: added `jointchiefs-mcp` stdio server target, `jointchiefs-keygetter` as sole Keychain identity, `APIKeyResolver` as the env/keygetter funnel, `StrategyConfig` + `StrategyConfigStore` for moderator/consensus/rounds persistence. Removed the stale local-HTTP-server section. Security model updated for lean-baseline direction (Developer ID + notarization + Sparkle, no XPC, no custom updater). |
 | 1.3 | 2026-04-19 | Added the `JointChiefsSetup` SwiftUI target (`jointchiefs-setup`) with Disclosure / Keys / Roles-&-Weights / Install / MCP-Config sections; the setup app goes through `APIKeyResolver.writeViaKeygetter` / `deleteViaKeygetter` rather than linking Keychain directly. Documented `StrategyConfig.providerWeights` and the weighted-voting path in `DebateOrchestrator.applyConsensusMode`. `ReviewProvider` now exposes `providerType` so the orchestrator can map a provider instance to its configured weight. |
 | 1.4 | 2026-04-20 | Added website + repository references to the header, plus a new Distribution section documenting the Netlify deployment of jointchiefs.ai (site id, domain aliases, Sparkle appcast location). Corrected the auto-update description to match the lean baseline — Sparkle for the app bundle only, no custom updater for CLI/MCP binaries. |
+| 1.5 | 2026-04-25 | Reconciled the Tech Stack and DebateOrchestrator sections with shipping reality — replaced the "Menu bar app, settings, transcript viewer" stack row with the four shipped surfaces (setup app, CLI, MCP server, keygetter); replaced "SwiftData persistence" with `StrategyConfig` JSON + local transcript files (SwiftData remains reserved for the deferred menu bar app). Bumped default debate rounds from 2 → 5 with adaptive early-break. Removed the "setup app is deferred" line above the project tree. Data-flow note flipped from "CLI or HTTP" to "CLI invocation or MCP tool call." |

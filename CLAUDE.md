@@ -3,11 +3,12 @@
 Multi-model AI code review orchestrator. Four surfaces — CLI, stdio MCP server, macOS setup app, and a single Keychain-access binary — all built from one `JointChiefsCore` engine. Sends code to multiple LLMs, runs a structured hub-and-spoke debate with Claude as moderator/decider, and streams a consensus summary back. Grounded in Multi-Agent Debate (MAD) research showing debate improves factuality and reasoning over single-model output.
 
 **Website:** https://jointchiefs.ai/ (live — source in the private `djfunboy/joint-chiefs-website` repo; this repo is the app)
-**Next session mission:** get the app fully ready to launch on the website. Start by reading `tasks/SESSION-HANDOFF-2026-04-21.md`.
+**Latest release:** v0.5.0 — adds the "Configured AI tools" panel (per-tool MCP wire-up status) and the sidebar update-status footer. Builds on v0.4.0's LM Studio support, MCP progress visibility, and Ollama timeout fix.
+**Next session:** start by reading the most recent `tasks/SESSION-HANDOFF-*.md` (gitignored; local-only).
 
 ## Current State
 
-- **Phases 1–5 complete.** Phase 6 (setup app) has shipped as a scaffold with every view migrated to Agentdeck tokens. Phase 8 (MCP server) is in progress — scaffolding + `joint_chiefs_review` tool ship, rate limits + strategy wiring still to land. Phase 10 (security + distribution) is in progress — website live at jointchiefs.ai with 10 articles + share buttons, first notarized DMG + real appcast entry still pending.
+- **Phases 1–3, 5, 8, and 10 complete.** Phase 6 (setup app) ships its full five-view installer with the v0.5.0 "Configured AI tools" panel showing per-tool MCP wire-up status; remaining items are accessibility (VoiceOver / Dynamic Type) and a real-Keychain end-to-end round-trip test, both tracked under Phase 9. Website live at jointchiefs.ai with notarized DMGs + Sparkle appcast through v0.4.0; v0.5.0 cuts on this commit's release.
 - **CLI installed** at `/opt/homebrew/bin/jointchiefs` (Apple Silicon only). Calls the orchestrator directly — no local HTTP server.
 - **MCP server** at `jointchiefs-mcp` — stdio-only, wraps the orchestrator via `modelcontextprotocol/swift-sdk` pinned exact 0.12.0. Spawned by any MCP-aware client via JSON-RPC over stdio.
 - **Setup app** at `jointchiefs-setup` — one-shot SwiftUI installer (Disclosure / Keys / Roles-&-Weights / Install / MCP-Config). All five views use Agentdeck tokens end-to-end. Keychain access goes through the keygetter only.
@@ -15,7 +16,7 @@ Multi-model AI code review orchestrator. Four surfaces — CLI, stdio MCP server
 - **5 providers working:** OpenAI, Gemini, Grok, Anthropic Claude, plus optional Ollama for local models.
 - **Streaming SSE** on every provider — tokens appear live as each model speaks.
 - **Hub-and-spoke debate:** spokes produce findings; the moderator (Claude by default) synthesizes rounds and writes the final anonymous consensus. 4 consensus modes: `moderatorDecides`, `strictMajority`, `bestOfAll`, `votingThreshold` (with per-provider weighting).
-- **60 tests passing.** No performance profiling done yet.
+- **80 tests passing.** No performance profiling done yet.
 
 ## Key Rules
 

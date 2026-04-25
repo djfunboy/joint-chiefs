@@ -1,6 +1,6 @@
 # Joint Chiefs — Build Plan
 
-**Version:** 1.5
+**Version:** 1.6
 **Last Updated:** 2026-04-25
 
 ## What's Built
@@ -20,13 +20,13 @@ progress: CLI, stdio MCP server, and (still to come) a setup app.
 - **Per-provider weighting:** `StrategyConfig.providerWeights` drives panel inclusion (weight 0 = excluded) and voting-threshold math; surfaced in the setup app
 - **Setup app scaffold:** `jointchiefs-setup` SwiftUI executable target with Disclosure / Keys / Roles-&-Weights / Install / MCP-Config screens — all five views migrated to Agentdeck tokens (`agentBgPanel`, `agentDialogTitle`, `AgentInputStyle`, `AgentPill`, `AgentChip`, `agentPanel`, `.agentPrimary` / `.agentSecondary` / `.agentDanger` button styles)
 - **Website live at [jointchiefs.ai](https://jointchiefs.ai/)** — static site deployed via Netlify. Source in the private `djfunboy/joint-chiefs-website` repo. Custom domain + Let's Encrypt cert configured.
-- **60 tests passing** (unit + orchestrator integration + consensus-mode coverage + weighted-voting + APIKeyResolver with fake-keygetter harness)
+- **80 tests passing** (unit + orchestrator integration + consensus-mode coverage + weighted-voting + APIKeyResolver with fake-keygetter harness)
 
-Phases 1–3 and 5 are complete. Phase 6 (setup app) ships as a scaffold with
-every view token-migrated; app-icon, signing, notarization, and real Keychain
-round-trip QA remain. Phase 8 (MCP server) ships the scaffold + one tool; rate
-limits and StrategyConfig wiring remain. Phase 10 (security + distribution) has
-the website deployed; signing + notarization + Sparkle integration remain.
+Phases 1–3, 5, 8, and 10 are complete. Phase 6 (setup app) ships its full
+five-view installer with the v0.5.0 "Configured AI tools" panel surfacing
+per-tool MCP wire-up status; remaining items are accessibility (VoiceOver /
+Dynamic Type) and a real-Keychain round-trip end-to-end test, both tracked
+under Phase 9.
 v2 security work is captured in tasks/SECURITY-AND-DIRECTION-PLAN-v2.md — with
 the lean baseline correction: Apple Developer ID + notarization + Sparkle,
 no YubiKey, no custom updater, no XPC.
@@ -163,6 +163,7 @@ surface that writes keys to the Keychain (via the keygetter) and persists
 9. ✅ MCP config snippet generator (keyless — reads destination path, outputs a standard `mcpServers` JSON block with a Copy button)
 10. ✅ First-run data-handling disclosure screen (what is sent off-device, what stays local, what the app doesn't do)
 11. ✅ All five views migrated to the Agentdeck design system — tokens in `JointChiefsSetup/DesignSystem/` (AgentdeckTokens, AgentdeckTypography, AgentdeckButtonStyle, AgentdeckComponents). No hex/CGFloat literals in any view. Components added: `AgentInputStyle` ViewModifier (dashed warm-tan focus), `agentPanel` View modifier, `AgentPill` (tinted status), `AgentChip` (picker replacement), `AgentSectionHeader` (uppercase eyebrow).
+12. ✅ "Configured AI tools" panel in MCPConfigView (v0.5.0). `MCPConfigScanner` walks home-dir conventional config locations (top-level dotfiles, `~/.<dir>/<file>`, `~/.config/<dir>/<file>`, `~/Library/Application Support/<dir>/<sub>/<file>`) and reports each MCP-server config it finds with structural confirmation (JSON `mcpServers` map, TOML `[mcp_servers...]` table) plus a Joint Chiefs entry-presence check. Pill summarizes "wired in M of N." Refresh button + on-appear `.task` keep it current. Stays generic: detection is by stanza shape, never by client name.
 
 **Remaining before distribution (tracked under Phase 10):**
 - App icon (`Resources/AppIcon.icns` + `CFBundleIconFile`). The bundle is functional without one; Finder just shows a generic icon.
@@ -206,7 +207,7 @@ app runs from the bundle, and via flat-sibling when it runs from
 
 ---
 
-## Phase 8: MCP Server 🟡 IN PROGRESS
+## Phase 8: MCP Server 🟢 COMPLETE
 
 **Goal:** Native integration with any MCP-aware client via the MCP stdio protocol.
 
@@ -215,15 +216,15 @@ app runs from the bundle, and via flat-sibling when it runs from
 2. ✅ Stdio-only server (`jointchiefs-mcp`) with `joint_chiefs_review` tool
 3. ✅ Smoke-tested — `initialize` + `tools/list` round-trip cleanly
 4. ✅ Installed at `/opt/homebrew/bin/jointchiefs-mcp`
-5. [ ] Wire `APIKeyResolver` (done) + `StrategyConfig` (in progress) into MCP tool invocation
-6. [ ] Rate limits: 1 concurrent review, 30/hour cap, cancel on stdin close
-7. [ ] Ship the standard `mcpServers` JSON snippet in the setup app and README
+5. ✅ `APIKeyResolver` + `StrategyConfig` wired into MCP tool invocation
+6. ✅ Rate limits: 1 concurrent review, 30/hour cap, cancel on stdin close (commit `57f7c7e`)
+7. ✅ Standard `mcpServers` JSON snippet in the setup app's MCPConfigView; README's "Wire it up" section points the host AI at the natural-language playbook
 
 **Checkpoint:**
-- [x] From an MCP client: calling `joint_chiefs_review` returns consensus summary (pre-rate-limit / pre-strategy)
+- [x] From an MCP client: calling `joint_chiefs_review` returns consensus summary
 - [x] MCP server starts/stops cleanly
-- [ ] Rate limits enforced and logged to stderr
-- [ ] Graceful cancellation on client disconnect
+- [x] Rate limits enforced and logged to stderr
+- [x] Graceful cancellation on client disconnect
 
 ---
 
@@ -232,15 +233,15 @@ app runs from the bundle, and via flat-sibling when it runs from
 **Goal:** Production-ready quality.
 
 **Steps:**
-1. ✅ Orchestrator integration tests with mock providers (60 tests passing — includes per-consensus-mode coverage, tiebreaker routing, weighted voting, and `providerWeights` JSON round-trip)
+1. ✅ Orchestrator integration tests with mock providers (80 tests passing — includes per-consensus-mode coverage, tiebreaker routing, weighted voting, `providerWeights` JSON round-trip, and APIKeyResolver fake-keygetter harness)
 2. ✅ Error handling audit for provider failure paths
 3. ✅ APIKeyResolver env/keygetter precedence covered with fake-keygetter harness
 4. [ ] Accessibility pass — VoiceOver/Dynamic Type on the setup app
 5. [ ] Performance profiling: memory, latency per full review cycle
-6. ✅ Documentation: README restructured for four-surface product (CLI, MCP, setup, keygetter); CLAUDE.md + all docs/*.md synced 2026-04-20
+6. ✅ Documentation: README restructured for four-surface product (CLI, MCP, setup, keygetter); CLAUDE.md + all docs/*.md synced 2026-04-25
 
 **Checkpoint:**
-- [x] All tests pass (60 passing)
+- [x] All tests pass (80 passing)
 - [x] Zero warnings in build
 - [ ] VoiceOver works on all interactive elements — with Phase 6
 - [ ] Idle memory profiled
@@ -290,3 +291,4 @@ reversed in favor of the standard Apple Developer flow.
 | 1.3 | 2026-04-19 | Phase 6 steps 5-10 complete: `jointchiefs-setup` SwiftUI target scaffolded with Disclosure / Keys / Roles-&-Weights / Install / MCP-Config screens. `StrategyConfig.providerWeights` added — 0 excludes a provider from the panel, positive values drive weighted voting in `.votingThreshold` mode. `APIKeyResolver` gained `writeViaKeygetter` / `deleteViaKeygetter`. `ReviewProvider.providerType` added so the orchestrator can resolve per-provider weight from a provider instance. Test count 52 → 60. Phase 9 step 1 checkpoint updated. |
 | 1.4 | 2026-04-20 | Phase 6 step 11 complete: all five setup-app views migrated to Agentdeck tokens. `AgentdeckComponents.swift` added — `AgentInputStyle`, `agentPanel`, `AgentPill`, `AgentChip`, `AgentSectionHeader`. Phase 10 steps 3–4 complete: public app repo live at `github.com/djfunboy/joint-chiefs`, website shipped to `jointchiefs.ai` via Netlify (custom domain + SSL). Phase 9 step 6 complete: README + CLAUDE.md + all docs synced to four-surface reality and current test counts. Phase 9 checkpoint test count corrected 52 → 60. |
 | 1.5 | 2026-04-25 | Phase 10 marked 🟢 COMPLETE — steps 5–11 reconciled with shipping reality (signing, notarization, DMG, Sparkle, redirect-stripping, MCP rate limits, SECURITY.md all landed across v0.1.0–v0.4.0). Sparkle integration note expanded to call out the v0.3.1 rpath hotfix that fixed the dyld-resolution failure in v0.2.0 + v0.3.0 cold-machine launches. |
+| 1.6 | 2026-04-25 | Phase 8 marked 🟢 COMPLETE — rate limits + StrategyConfig wiring reconciled with shipping reality across v0.3.x–v0.4.0 (Phase 8 steps 5–7 had been left stale while Phase 10 already showed them done). Phase 6 step 12 added: v0.5.0 "Configured AI tools" panel surfacing per-tool MCP wire-up status. Test count synced 60 → 80 in the "What's Built" section, Phase 9 step 1, and Phase 9 checkpoint. Top-of-doc status line updated to reflect the four-surface product shipping today. |
