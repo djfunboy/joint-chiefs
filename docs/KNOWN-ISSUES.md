@@ -11,6 +11,15 @@ All six setup-app surfaces (`RootView`, `DisclosureView`, `KeysView`, `RolesWeig
 - **Ollama toggle** uses the system default `Toggle` chrome. Agentdeck doesn't yet spec a custom toggle style; revisit if the native look feels out of place against the warm surfaces.
 - **Picker (Tiebreaker)** uses the native `.menu` picker; consensus/moderator moved to `AgentChip`. The menu picker still shows the macOS accent tint — acceptable for a dropdown, but worth revisiting if it reads as inconsistent.
 
+### Sidebar update-status footer
+
+Tracked as a set — the feature is functional in `UpdaterService.swift` + `RootView.swift` (currently uncommitted as WIP). Four polish items to address before or alongside the next release that lands the feature:
+
+- **Pill kind is `.success` (green); should be `.info` or `.accent`.** Per `docs/DESIGN-SYSTEM.md`: *"Green means 'ready' — for success, merge-ready, validated states."* An "update available" notification is informational, not a validated state. Fix: in `RootView.swift` `UpdateStatusFooter`, change `kind: .success` → `kind: .info` (blue) or `kind: .accent` (warm-tan). One-line change.
+- **Stale `availableUpdateVersion` after dismissed install modal.** If the user clicks the "update available" pill, Sparkle's install modal opens, and they dismiss it without installing, the pill stays visible until the next scheduled background check (Sparkle's default is hourly). Fix options: (a) wire a `SPUUserDriverDelegate` so dismissal clears the version, or (b) clear the version on the next `checkForUpdates()` call regardless of outcome and rely on Sparkle to re-fire `didFindValidUpdate` if still pending.
+- **No "checking…" feedback during user-triggered check.** The button disables via `canCheckForUpdates` while Sparkle queries the appcast, but there's no spinner. On slow networks the click feels unresponsive. Fix: add a short-lived `isChecking` flag set in `UpdaterService.checkForUpdates()`, cleared when Sparkle's KVO fires `canCheckForUpdates = true` again. Render a `ProgressView` in the button label while set.
+- **Pill / current-version typography scale mismatch.** `AgentPill` defaults to `agentSmall` (mono 12pt / 600); the current-version label below uses `agentXS` (11pt / 400). May feel chunky stacked. Fix: visual check after `scripts/build-app.sh` + reinstall; if mismatched, either expose a `compact` variant on `AgentPill` or override the pill's font locally in this footer.
+
 ## Active Bugs
 
 _None currently tracked._
