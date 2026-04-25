@@ -93,6 +93,15 @@ final class SetupModel {
     var installDestination: URL = SetupModel.defaultInstallDirectory()
     var cliInstallStatus: CLIInstallStatus = .unknown
 
+    // MARK: - MCP config scan
+
+    /// MCP-server config files discovered on this machine, with per-file
+    /// "is Joint Chiefs wired up here?" status. Drives the MCP Config view's
+    /// "wired in M of N configs" panel. Empty until `refreshMCPConfigScan()`
+    /// runs; refreshed on demand.
+    var mcpConfigScan: [MCPConfigScanner.Location] = []
+    var mcpConfigScanIsRunning: Bool = false
+
     // MARK: - Init
 
     init() {
@@ -400,6 +409,21 @@ final class SetupModel {
         } catch {
             cliInstallStatus = .failed(error.localizedDescription)
         }
+    }
+
+    // MARK: - MCP config scan
+
+    /// Re-runs the MCP config scan. Call from `.task` on MCP Config view appear
+    /// and from a Refresh button. Off-loads I/O to a detached task so the home
+    /// directory walk doesn't block the main thread.
+    func refreshMCPConfigScan() async {
+        if mcpConfigScanIsRunning { return }
+        mcpConfigScanIsRunning = true
+        let results = await Task.detached(priority: .utility) {
+            MCPConfigScanner.scan()
+        }.value
+        mcpConfigScan = results
+        mcpConfigScanIsRunning = false
     }
 
     /// Forces a re-install to a user-chosen destination. Used by the recovery

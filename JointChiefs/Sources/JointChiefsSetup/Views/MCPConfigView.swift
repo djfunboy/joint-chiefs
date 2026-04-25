@@ -14,6 +14,7 @@ struct MCPConfigView: View {
         ) {
             VStack(alignment: .leading, spacing: AgentSpacing.lg) {
                 cliStatusPanel
+                wiredUpStatusPanel
                 aiPromptPanel
                 jsonConfigPanel
                 verificationPanel
@@ -25,6 +26,9 @@ struct MCPConfigView: View {
             }
             .buttonStyle(.agentPrimary)
             .keyboardShortcut(.defaultAction)
+        }
+        .task {
+            await model.refreshMCPConfigScan()
         }
     }
 
@@ -87,6 +91,101 @@ struct MCPConfigView: View {
         if panel.runModal() == .OK, let url = panel.url {
             Task { await model.reinstallCLI(to: url) }
         }
+    }
+
+    // MARK: - Wired-up status
+
+    private var wiredUpStatusPanel: some View {
+        VStack(alignment: .leading, spacing: AgentSpacing.sm) {
+            HStack {
+                AgentSectionHeader(text: "Configured AI tools")
+                Spacer()
+                if model.mcpConfigScanIsRunning {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Button("Refresh") {
+                        Task { await model.refreshMCPConfigScan() }
+                    }
+                    .buttonStyle(.agentGhost)
+                    .accessibilityLabel("Re-scan for MCP config files")
+                }
+            }
+
+            wiredUpSummary
+
+            if !model.mcpConfigScan.isEmpty {
+                VStack(alignment: .leading, spacing: AgentSpacing.xs) {
+                    ForEach(model.mcpConfigScan) { location in
+                        HStack(alignment: .firstTextBaseline, spacing: AgentSpacing.sm) {
+                            Image(systemName: location.hasJointChiefsEntry ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(location.hasJointChiefsEntry ? Color.agentSuccess : Color.agentTextMuted)
+                                .font(.agentSmall)
+                                .accessibilityHidden(true)
+                            Text(displayPath(for: location.path))
+                                .font(.agentSmall)
+                                .foregroundStyle(Color.agentTextPrimary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .textSelection(.enabled)
+                            Spacer(minLength: 0)
+                            Text(location.format.rawValue.uppercased())
+                                .font(.agentXS)
+                                .foregroundStyle(Color.agentTextMuted)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel(
+                            "\(displayPath(for: location.path)) — \(location.hasJointChiefsEntry ? "Joint Chiefs configured" : "Joint Chiefs not configured")"
+                        )
+                    }
+                }
+            }
+
+            Text("Lists AI tools with at least one MCP server configured. Run the prompt below once in each tool where you want Joint Chiefs available — after it edits the config and you restart that tool, hit Refresh and the row turns green.")
+                .font(.agentXS)
+                .foregroundStyle(Color.agentTextMuted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .agentPanel()
+    }
+
+    @ViewBuilder
+    private var wiredUpSummary: some View {
+        let total = model.mcpConfigScan.count
+        let wired = model.mcpConfigScan.filter(\.hasJointChiefsEntry).count
+        if total == 0 {
+            AgentPill(
+                text: model.mcpConfigScanIsRunning ? "scanning…" : "no configs found yet",
+                kind: .neutral,
+                icon: "magnifyingglass"
+            )
+        } else if wired == total {
+            AgentPill(
+                text: "wired in \(wired) of \(total)",
+                kind: .success,
+                icon: "checkmark.seal.fill"
+            )
+        } else if wired > 0 {
+            AgentPill(
+                text: "wired in \(wired) of \(total)",
+                kind: .warning,
+                icon: "exclamationmark.triangle.fill"
+            )
+        } else {
+            AgentPill(
+                text: "found \(total), wired in 0",
+                kind: .warning,
+                icon: "exclamationmark.triangle.fill"
+            )
+        }
+    }
+
+    private func displayPath(for url: URL) -> String {
+        let home = NSHomeDirectory()
+        let path = url.path
+        if path.hasPrefix(home) {
+            return "~" + path.dropFirst(home.count)
+        }
+        return path
     }
 
     // MARK: - AI prompt (primary path)
