@@ -142,7 +142,7 @@ struct ConsensusBuilderTests {
     @Test("Models consulted lists all providers")
     func modelsConsulted() {
         let providers: [any ReviewProvider] = [
-            MockProvider(name: "OpenAI", model: "gpt-5.4"),
+            MockProvider(name: "OpenAI", model: "gpt-5.5"),
             MockProvider(name: "Gemini", model: "gemini-3.1-pro-preview"),
         ]
 

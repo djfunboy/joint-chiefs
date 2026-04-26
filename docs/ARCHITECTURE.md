@@ -367,13 +367,13 @@ for enum-keyed dictionaries. See the custom `init(from:)` / `encode(to:)` in
 | Variable | Purpose | Default |
 |---|---|---|
 | `OPENAI_API_KEY` | OpenAI authentication | (required to enable OpenAI) |
-| `OPENAI_MODEL` | OpenAI model override | `gpt-5.4` |
+| `OPENAI_MODEL` | OpenAI model override | `gpt-5.5` |
 | `GEMINI_API_KEY` | Google Gemini authentication | (required to enable Gemini) |
 | `GEMINI_MODEL` | Gemini model override | `gemini-3.1-pro-preview` |
 | `GROK_API_KEY` | xAI Grok authentication | (required to enable Grok) |
 | `GROK_MODEL` | Grok model override | `grok-3` |
 | `ANTHROPIC_API_KEY` | Anthropic authentication — also serves as deciding model | (required to enable Claude) |
-| `ANTHROPIC_MODEL` | Claude model override | `claude-opus-4-6` |
+| `ANTHROPIC_MODEL` | Claude model override | `claude-opus-4-7` |
 | `OLLAMA_ENABLED` | Set to `1` to force-include / `0` to force-exclude the local Ollama general (overrides `StrategyConfig.ollama.enabled`) | unset (use `StrategyConfig`) |
 | `OLLAMA_MODEL` | Ollama model override | `llama3` |
 | `OPENAI_COMPATIBLE_BASE_URL` | Force-enable an OpenAI-compatible local server (LM Studio, Jan, llama.cpp-server, Msty, LocalAI). CI override for `StrategyConfig.openAICompatible`. | unset |

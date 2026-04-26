@@ -18,12 +18,12 @@ public struct OpenAIProvider: ReviewProvider {
     ///
     /// - Parameters:
     ///   - apiKey: The OpenAI API key used for authentication.
-    ///   - model: The model identifier to use. Defaults to `"gpt-5.4"`.
+    ///   - model: The model identifier to use. Defaults to `"gpt-5.5"`.
     ///   - endpoint: The base URL for the OpenAI API. Defaults to `https://api.openai.com/v1`.
     ///   - urlSession: The URL session to use for requests. Defaults to `.shared`.
     public init(
         apiKey: String,
-        model: String = "gpt-5.4",
+        model: String = "gpt-5.5",
         endpoint: URL = URL(string: "https://api.openai.com/v1")!,
         urlSession: URLSession = .shared
     ) {
