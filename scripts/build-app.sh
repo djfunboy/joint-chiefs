@@ -23,11 +23,48 @@ BUILD_DIR="$REPO_ROOT/build"
 APP_PATH="$BUILD_DIR/Joint Chiefs.app"
 INFO_PLIST_TEMPLATE="$REPO_ROOT/scripts/Info.plist"
 
-# Version metadata for Info.plist. CFBundleShortVersionString is the user-facing
-# version; CFBundleVersion is a monotonic build number (epoch seconds is fine
-# for dev builds, CI will overwrite both via env).
-VERSION="${JC_VERSION:-0.1.0}"
-BUILD_NUMBER="${JC_BUILD:-$(date +%s)}"
+# Version metadata for Info.plist.
+#
+# CFBundleShortVersionString is the user-facing version (e.g. "0.5.2").
+#
+# CFBundleVersion is the build number Sparkle uses to decide whether one
+# release is newer than another. It does **natural-numeric comparison** — not
+# semver. Any release whose CFBundleVersion is lower than a previously-shipped
+# release will trigger a downgrade in Sparkle's update dialog. This bit us in
+# v0.5.0 (built with CFBundleVersion=5 while v0.4.0 used a Unix-timestamp build
+# of 1776962397; Sparkle then offered v0.5.0 users a "downgrade" to v0.4.0).
+# See tasks/lessons.md 2026-04-26.
+#
+# Permanent scheme (locked in starting v0.5.2):
+#
+#   - CFBundleVersion is a monotonically-increasing integer. Strictly greater
+#     than every previously-shipped release. Never derived from a timestamp.
+#   - v0.5.2 floor: 1777000000 (chosen to clear v0.4.0's legacy timestamp
+#     1776962397 plus headroom). Increment by 1 per future release: v0.5.3 =
+#     1777000001, v0.6.0 = 1777000002, etc.
+#   - The release process MUST set JC_BUILD to the new monotonic int before
+#     calling this script. Dev builds without JC_BUILD get a placeholder of 0
+#     and a warning; that's harmless because dev builds aren't shipped.
+#   - For release safety, the caller SHOULD also set JC_PREVIOUS_BUILD to the
+#     previous release's build number; this script then refuses to build if
+#     JC_BUILD is not strictly greater.
+VERSION="${JC_VERSION:-0.0.0-dev}"
+BUILD_NUMBER="${JC_BUILD:-0}"
+
+if [[ "$BUILD_NUMBER" == "0" ]]; then
+    echo "warn: building with placeholder CFBundleVersion=0 (dev mode)" >&2
+    echo "      For release: set JC_BUILD to a monotonic int strictly greater" >&2
+    echo "      than the previous release. See header of this script for the" >&2
+    echo "      permanent scheme." >&2
+elif [[ -n "${JC_PREVIOUS_BUILD:-}" ]]; then
+    if (( BUILD_NUMBER <= JC_PREVIOUS_BUILD )); then
+        echo "error: JC_BUILD ($BUILD_NUMBER) must be strictly greater than" >&2
+        echo "       JC_PREVIOUS_BUILD ($JC_PREVIOUS_BUILD). Sparkle compares" >&2
+        echo "       CFBundleVersion as a natural-numeric value; a non-monotonic" >&2
+        echo "       build number will trigger a downgrade in the update dialog." >&2
+        exit 1
+    fi
+fi
 
 echo "==> Building SPM targets (release)"
 cd "$PKG_ROOT"
