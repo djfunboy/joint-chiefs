@@ -85,7 +85,7 @@ the CLI and MCP server. Five sections, in display order:
 - [x] **Privacy** (last screen) — data-handling disclosure: what's sent to providers, what stays local, what the app refuses to do (no telemetry, no analytics); MIT-licensed link to the public repo
 - [x] Silent CLI install on first launch (v0.3.0) — `SetupModel.installCLIIfNeeded()` copies the three binaries into `/opt/homebrew/bin` (or `~/.local/bin` fallback) at `RootView.task` time; replaced the earlier user-facing Install pane
 - [x] All five views migrated to Agentdeck design tokens (no hex/CGFloat literals in any view); new design-system components: `AgentInputStyle`, `agentPanel`, `AgentPill`, `AgentChip`, `AgentSectionHeader`, `SetupPage`
-- [x] Bundled in `Joint Chiefs.app` with `Contents/Resources/` binaries — DMGs notarized + stapled through v0.5.2
+- [x] Bundled in `Joint Chiefs.app` with `Contents/Resources/` binaries — DMGs notarized + stapled through v0.5.3
 - [x] **"Configured AI tools" panel (v0.5.0)** — `MCPConfigScanner` walks home-dir conventional config locations (top-level dotfiles, `~/.<dir>/<file>`, `~/.config/<dir>/<file>`, `~/Library/Application Support/<dir>/<sub>/<file>`), structurally confirms each MCP-server stanza, and reports per-tool wire-up status with a "wired in M of N" pill. Detection is by stanza shape, never by client name.
 - [x] **Sidebar update-status footer (v0.5.0)** — currently-running version + Sparkle-driven "Check for updates" / "update available" affordance with inline spinner during user-triggered checks.
 - [ ] VoiceOver + Dynamic Type pass (tracked in Phase 9)
