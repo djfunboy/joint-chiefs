@@ -46,7 +46,8 @@ struct ModelTests {
 
     @Test("ProviderType has correct default models")
     func providerTypeDefaultModels() {
-        #expect(ProviderType.openAI.defaultModel == "gpt-5.4")
+        #expect(ProviderType.openAI.defaultModel == "gpt-5.5")
+        #expect(ProviderType.anthropic.defaultModel == "claude-opus-4-7")
         #expect(ProviderType.gemini.defaultModel == "gemini-3.1-pro-preview")
         #expect(ProviderType.grok.defaultModel == "grok-3")
         #expect(ProviderType.ollama.defaultModel == "llama3")
@@ -82,7 +83,7 @@ struct ModelTests {
     func providerReviewCodable() throws {
         let review = ProviderReview(
             providerName: "OpenAI",
-            model: "gpt-5.4",
+            model: "gpt-5.5",
             content: "Looks good",
             findings: [TestHelpers.makeSampleFinding()]
         )

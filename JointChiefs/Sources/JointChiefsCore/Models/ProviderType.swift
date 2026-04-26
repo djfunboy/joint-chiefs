@@ -16,8 +16,8 @@ public enum ProviderType: String, Codable, CaseIterable, Sendable {
 
     public var defaultModel: String {
         switch self {
-        case .openAI: "gpt-5.4"
-        case .anthropic: "claude-opus-4-6"
+        case .openAI: "gpt-5.5"
+        case .anthropic: "claude-opus-4-7"
         case .gemini: "gemini-3.1-pro-preview"
         case .grok: "grok-3"
         case .ollama: "llama3"
@@ -37,16 +37,16 @@ public enum ProviderType: String, Codable, CaseIterable, Sendable {
         switch self {
         case .openAI:
             return [
-                "gpt-5.4",        // flagship (default)
+                "gpt-5.5",        // flagship (default) — released 2026-04-23
+                "gpt-5.5-pro",    // pro-tier reasoning for hard problems
+                "gpt-5.4",        // prior flagship
                 "gpt-5.4-mini",   // fast + cheap
-                "gpt-4.1",        // prior flagship, still strong
-                "gpt-4o",         // multimodal
-                "gpt-4o-mini"     // budget multimodal
+                "gpt-5.3-codex"   // coding-specialized (no 5.5-codex variant yet)
             ]
         case .anthropic:
             return [
-                "claude-opus-4-6",               // flagship (default — moderator)
-                "claude-opus-4-7",               // newest flagship
+                "claude-opus-4-7",               // flagship (default — moderator)
+                "claude-opus-4-6",               // prior flagship
                 "claude-sonnet-4-6",             // balanced
                 "claude-haiku-4-5-20251001",     // fast + cheap
                 "claude-3-7-sonnet-latest"       // prior-gen fallback

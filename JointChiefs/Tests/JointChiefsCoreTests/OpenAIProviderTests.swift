@@ -10,7 +10,7 @@ struct OpenAIProviderTests {
     private func makeProvider(session: URLSession? = nil) -> OpenAIProvider {
         OpenAIProvider(
             apiKey: "test-key-123",
-            model: "gpt-5.4",
+            model: "gpt-5.5",
             endpoint: testEndpoint,
             urlSession: session ?? TestHelpers.makeTestURLSession()
         )
@@ -33,7 +33,7 @@ struct OpenAIProviderTests {
         let review = try await provider.review(code: context.code, context: context)
 
         #expect(review.providerName == "OpenAI")
-        #expect(review.model == "gpt-5.4")
+        #expect(review.model == "gpt-5.5")
         #expect(review.findings.count == 2)
         #expect(review.findings[0].title == "Missing error handling")
         #expect(review.findings[0].severity == .high)

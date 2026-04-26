@@ -94,6 +94,24 @@ This is a parallel surface to the in-repo README/docs scan from the prior 2026-0
   7. **Only then** push the website branch (cask + appcast + page edits live as one push so Netlify deploys all of it together).
 The trap is that the appcast push needs to wait until after the GH release exists, but the page edits (download URL, JSON-LD, announce bars) can ship alongside. Treat the website push as one atomic event — don't split appcast from the rest, because that's how the page-edit half got skipped today.
 
+### 2026-04-26: Model picker shipped with `gpt-5.4` as flagship after OpenAI released `gpt-5.5`
+**What happened:** OpenAI released `gpt-5.5` on 2026-04-23. v0.5.0/v0.5.2 both shipped with `gpt-5.4` as `ProviderType.openAI.defaultModel` and at the top of `availableModels`. Same drift on Anthropic — `claude-opus-4-7` was already in the curated list with the comment "newest flagship," but the default never got promoted from `claude-opus-4-6`. Caught when Chris noticed `gpt-5.5` was missing from the picker. Provider model lists are the most time-sensitive surface in the product — they go stale within days, not weeks.
+**Rule:** **Pre-release model-list refresh is a hard checklist item.** Before tagging any release, query each provider's authoritative `/v1/models` endpoint (or equivalent) and update both `ProviderType.availableModels` and `ProviderType.defaultModel` if a newer flagship has shipped. Curl recipes:
+  1. **OpenAI** — `curl -s https://api.openai.com/v1/models -H "Authorization: Bearer $OPENAI_API_KEY" | jq -r '.data[].id' | sort -V`. Look for highest `gpt-X.Y` flagship, `gpt-X.Y-pro`, `gpt-X.Y-mini`, `gpt-X.Y-nano`, and the highest `gpt-X.Y-codex` variant.
+  2. **Anthropic** — `curl -s https://api.anthropic.com/v1/models -H "x-api-key: $ANTHROPIC_API_KEY" -H "anthropic-version: 2023-06-01" | jq -r '.data[].id' | sort -V`. Look for highest `claude-opus-*`, `claude-sonnet-*`, `claude-haiku-*`.
+  3. **Google Gemini** — `curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=$GEMINI_API_KEY" | jq -r '.models[].name'`. Look for highest `models/gemini-*`.
+  4. **xAI Grok** — `curl -s https://api.x.ai/v1/models -H "Authorization: Bearer $GROK_API_KEY" | jq -r '.data[].id'`. Look for highest `grok-*`.
+
+When a default changes, also update:
+  - `OpenAIProvider.swift` (or per-provider source) `init(model:)` default-arg literal.
+  - `Tests/.../ModelTests.swift` `defaultModel` assertions.
+  - `Tests/.../OpenAIProviderTests.swift` (and per-provider equivalents) — `model:` arg + `#expect(review.model == ...)` assertions.
+  - `CLAUDE.md` "Default models" line.
+  - `docs/ARCHITECTURE.md` env-var table defaults.
+  - `README.md` env-var table defaults.
+
+This list is part of step 5 (doc scan) of the "Pre-release review (public repo)" checklist in `CLAUDE.md`. Treat it as load-bearing — provider releases happen out-of-band and the picker rots fast.
+
 ## Common Traps
 
 _To be populated during development._
