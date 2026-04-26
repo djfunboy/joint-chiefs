@@ -55,6 +55,19 @@
   7. **Contributing roadmap line** — claimed-future capabilities match what the v0.4.0 OpenAI-compat path already enables (don't say something is unsupported when users can reach it today).
 This is in addition to the existing doc list (CLAUDE.md current-state line, BUILD-PLAN, PRD, ARCHITECTURE, DATA-MODEL, VALUE-PROPOSITION, DESIGN-SYSTEM, KNOWN-ISSUES). Run the full reconciliation *before* tagging, not after Chris notices it on GitHub.
 
+### 2026-04-26: Website Quickstart shipped two installation bugs that would brick a new user
+**What happened:** The jointchiefs.ai homepage Quickstart had a `cp` command that only copied the `jointchiefs` CLI (missing `jointchiefs-mcp` and `jointchiefs-keygetter`), and the MCP config snippet's `command` path was `/usr/local/bin/jointchiefs-mcp` — the Intel-era Homebrew prefix. Apple Silicon (the only supported platform) uses `/opt/homebrew/bin/`, so the snippet would never resolve. Either bug alone would block setup; together they made the Quickstart purely decorative for anyone following it literally. The bugs were caught only because Chris scrolled the live site and noticed.
+**Rule:** Every app release that touches install paths, binary names, install scripts, the keygetter, or the MCP server's command surface requires a verification pass against the website Quickstart and download page **before** tagging. The verification list, run from inside `~/Dropbox/Build/Joint Chiefs Website/`:
+  1. **`index.html` `#quickstart` step 01 cp command** — every executable product in `Package.swift` (`jointchiefs`, `jointchiefs-mcp`, `jointchiefs-keygetter`) is in the line. Verify against `swift package describe --type json | jq '.products[] | select(.type.executable) | .name'` or just `grep '.executable(' Package.swift`.
+  2. **`index.html` `#quickstart` step 03 MCP snippet `command`** — path matches the actual install destination. Apple Silicon is `/opt/homebrew/bin/`, never `/usr/local/bin/` (Intel prefix). Cross-check against `mcpBinaryPath` in `JointChiefs/Sources/JointChiefsSetup/Views/MCPConfigView.swift`.
+  3. **`download.html` "Command line" cp command** — same as item 1; the two snippets must stay in sync.
+  4. **`guide/mcp.html` step 02 MCP snippet `command`** — same path as item 2.
+  5. **`guide/cli.html` env-var table and flag table** — every env var read by `JointChiefsCore` (`grep -rn "ProcessInfo.processInfo.environment\\|getenv" Sources/JointChiefsCore`) and every `@Option`/`@Flag` in `Sources/JointChiefsCLI/` is listed.
+  6. **`setup-guide.md` ↔ in-app `aiPrompt` ↔ `llms.txt`** — paths, tool name (`joint_chiefs_review`), restart guidance, and rate-limit numbers match. Treat the trio as one logical surface; a change to any one requires the others.
+  7. **`download.html` requirements table** — provider list matches `ProviderType` enum cases.
+  8. **JSON-LD `softwareVersion` in `index.html`** and the `<announce-bar>` text on `guide/*.html` — bumped to the new release.
+This is a parallel surface to the in-repo README/docs scan from the prior 2026-04-26 lesson — the website is just as user-facing and just as subject to drift. Run it before tagging the app release. Both lists are part of step 5 of the "Pre-release review (public repo)" in CLAUDE.md.
+
 ## Common Traps
 
 _To be populated during development._
