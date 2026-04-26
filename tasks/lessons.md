@@ -68,6 +68,16 @@ This is in addition to the existing doc list (CLAUDE.md current-state line, BUIL
   8. **JSON-LD `softwareVersion` in `index.html`** and the `<announce-bar>` text on `guide/*.html` — bumped to the new release.
 This is a parallel surface to the in-repo README/docs scan from the prior 2026-04-26 lesson — the website is just as user-facing and just as subject to drift. Run it before tagging the app release. Both lists are part of step 5 of the "Pre-release review (public repo)" in CLAUDE.md.
 
+### 2026-04-26: Sparkle "downgrade as update" — inconsistent CFBundleVersion scheme
+**What happened:** v0.4.0 was built with `CFBundleVersion=$(date +%s)` → `1776962397` (the default in `scripts/build-app.sh`). v0.5.0 was built with `JC_BUILD=5` env override → `5`. Sparkle's appcast comparator does **natural-numeric comparison on `CFBundleVersion`**, not semver — so `1776962397 > 5`, and Sparkle declared v0.4.0 newer than v0.5.0. Fresh v0.5.0 installs were prompted to "update" to v0.4.0 (an actual downgrade), with v0.4.0's release notes shown. Caught when the user saw the update dialog offering v0.4.0. Website-side fix landed first (commit `7d826d6` on `joint-chiefs-website` stripped older entries from `appcast.xml` to break the loop). App-side fix in v0.5.2 locks the scheme.
+**Rule:** **`CFBundleVersion` is the only thing Sparkle compares. It must be a monotonically-increasing integer, strictly greater than every previously-shipped release. Never derive it from a timestamp.** Operational rules:
+  1. **Permanent floor for the JC scheme:** v0.5.2 = `1777000000` (chosen to clear v0.4.0's `1776962397` plus headroom). Every future release increments by 1 (`v0.5.3 = 1777000001`, `v0.6.0 = 1777000002`, etc.).
+  2. **Never use `$(date +%s)` or any timestamp expression** as the CFBundleVersion default. The dev-mode default in `build-app.sh` is `0` with a loud warning — release builds that ship without an explicit `JC_BUILD` should be impossible by accident.
+  3. **Release process MUST set both `JC_BUILD` and `JC_PREVIOUS_BUILD`** when calling `build-app.sh`. The script refuses to build if `JC_BUILD <= JC_PREVIOUS_BUILD`. This is the regression check that kills the bug class.
+  4. **`CFBundleShortVersionString` is for humans only** ("0.5.2"). Sparkle ignores it. Don't rely on it for upgrade ordering.
+  5. **Every release's `<item>` in `appcast.xml`** must carry `sparkle:version` matching the new `CFBundleVersion` exactly. Do **not** put the short version string in `sparkle:version`.
+  6. **Pre-release verification:** before tagging, confirm the candidate `CFBundleVersion` is strictly greater than the most recent `<item>`'s `sparkle:version` in the live `appcast.xml`. If you don't have web access, the previous release's `BUILD_NUMBER` lives in the prior tag's `Info.plist`.
+
 ## Common Traps
 
 _To be populated during development._
