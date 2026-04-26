@@ -18,12 +18,12 @@ public struct GrokProvider: ReviewProvider {
     ///
     /// - Parameters:
     ///   - apiKey: The xAI API key used for authentication.
-    ///   - model: The model identifier to use. Defaults to `"grok-4-0709"`.
+    ///   - model: The model identifier to use. Defaults to `"grok-4.20-0309-reasoning"`.
     ///   - endpoint: The base URL for the xAI API. Defaults to `https://api.x.ai/v1`.
     ///   - urlSession: The URL session to use for requests. Defaults to `.shared`.
     public init(
         apiKey: String,
-        model: String = "grok-4-0709",
+        model: String = "grok-4.20-0309-reasoning",
         endpoint: URL = URL(string: "https://api.x.ai/v1")!,
         urlSession: URLSession = .shared
     ) {

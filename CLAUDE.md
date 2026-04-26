@@ -61,7 +61,7 @@ Optional model overrides (env vars): `OPENAI_MODEL`, `GEMINI_MODEL`, `GROK_MODEL
 
 Strategy (moderator / tiebreaker / consensus mode / rounds / timeout / per-provider weights) is persisted as `StrategyConfig` — see `docs/DATA-MODEL.md`.
 
-**Default models:** `gpt-5.5`, `gemini-3.1-pro-preview`, `grok-4-0709`, `claude-opus-4-7`
+**Default models:** `gpt-5.5`, `gemini-3.1-pro-preview`, `grok-4.20-0309-reasoning`, `claude-opus-4-7`
 **Default debate settings:** 5 rounds with adaptive early break, 120s per-request timeout
 
 ### Local API Keys (dev only)

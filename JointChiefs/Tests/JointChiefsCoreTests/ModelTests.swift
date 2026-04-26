@@ -49,7 +49,7 @@ struct ModelTests {
         #expect(ProviderType.openAI.defaultModel == "gpt-5.5")
         #expect(ProviderType.anthropic.defaultModel == "claude-opus-4-7")
         #expect(ProviderType.gemini.defaultModel == "gemini-3.1-pro-preview")
-        #expect(ProviderType.grok.defaultModel == "grok-4-0709")
+        #expect(ProviderType.grok.defaultModel == "grok-4.20-0309-reasoning")
         #expect(ProviderType.ollama.defaultModel == "llama3")
     }
 
