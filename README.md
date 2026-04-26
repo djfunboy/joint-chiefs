@@ -157,7 +157,7 @@ Full details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 | `GEMINI_API_KEY` | Google Gemini authentication | (required to enable Gemini) |
 | `GEMINI_MODEL` | Gemini model override | `gemini-3.1-pro-preview` |
 | `GROK_API_KEY` | xAI Grok authentication | (required to enable Grok) |
-| `GROK_MODEL` | Grok model override | `grok-3` |
+| `GROK_MODEL` | Grok model override | `grok-4-0709` |
 | `ANTHROPIC_API_KEY` | Anthropic — also serves as moderator | (required to enable Claude) |
 | `ANTHROPIC_MODEL` | Claude model override | `claude-opus-4-7` |
 | `OLLAMA_ENABLED` | Set to `1` to force-include / `0` to force-exclude the local Ollama general (overrides `StrategyConfig.ollama.enabled`) | unset (use `StrategyConfig`) |

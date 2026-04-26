@@ -19,7 +19,7 @@ public enum ProviderType: String, Codable, CaseIterable, Sendable {
         case .openAI: "gpt-5.5"
         case .anthropic: "claude-opus-4-7"
         case .gemini: "gemini-3.1-pro-preview"
-        case .grok: "grok-3"
+        case .grok: "grok-4-0709"
         case .ollama: "llama3"
         case .openAICompatible: ""
         }
@@ -61,11 +61,11 @@ public enum ProviderType: String, Codable, CaseIterable, Sendable {
             ]
         case .grok:
             return [
-                "grok-3",         // flagship (default)
-                "grok-3-mini",    // fast
-                "grok-2",         // prior flagship
-                "grok-2-mini",    // prior fast
-                "grok-beta"       // experimental
+                "grok-4-0709",                  // flagship (default) — base GA grok-4
+                "grok-4.20-0309-reasoning",     // newest reasoning-tuned snapshot
+                "grok-4-fast-reasoning",        // fast + reasoning
+                "grok-code-fast-1",             // coding-specialized
+                "grok-3"                        // prior-gen fallback
             ]
         case .ollama:
             return []
