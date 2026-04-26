@@ -62,9 +62,14 @@ final class SetupModel {
     var ollamaStatus: OllamaStatus = .unknown
 
     // OpenAI-compatible (LM Studio, Jan, llama.cpp, etc.) test status. Same
-    // shape as OllamaStatus — the `.ok` payload is a human-readable summary
-    // (e.g. "LM Studio · 3 models") instead of a single model string, because
-    // /v1/models returns the full roster.
+    // shape as OllamaStatus. The `.ok` payload is the exact model identifier
+    // that will participate in the debate (e.g. "LM Studio · qwen3-coder-30b")
+    // when the configured Model field matches one of the server's loaded
+    // models. If the user hasn't typed a Model yet, it falls back to a
+    // "server reachable" summary. If the user typed a Model that the server
+    // doesn't expose in /v1/models, the test fails with a list of what IS
+    // available — keeps users from saving a config that won't actually fire
+    // a review.
     enum OpenAICompatibleStatus: Equatable {
         case unknown
         case testing
@@ -304,9 +309,35 @@ final class SetupModel {
                 let data: [Entry]
             }
             let parsed = try? JSONDecoder().decode(ModelListResponse.self, from: data)
-            let count = parsed?.data.count ?? 0
+            let availableIds = (parsed?.data.map { $0.id }) ?? []
+            let configuredModel = strategy.openAICompatible.model
+                .trimmingCharacters(in: .whitespacesAndNewlines)
             let presetName = strategy.openAICompatible.presetName
-            openAICompatibleStatus = .ok("\(presetName) · \(count) model\(count == 1 ? "" : "s")")
+
+            if configuredModel.isEmpty {
+                // Server reachable but no model selected. Signal what's
+                // available so the user knows what to type.
+                let count = availableIds.count
+                let preview = availableIds.prefix(3).joined(separator: ", ")
+                let suffix = availableIds.count > 3 ? "…" : ""
+                if count == 0 {
+                    openAICompatibleStatus = .failed("\(presetName) reachable but reports no models — load one first")
+                } else {
+                    openAICompatibleStatus = .failed("\(presetName) reachable — paste a model id into the Model field above (\(count) available: \(preview)\(suffix))")
+                }
+            } else if availableIds.contains(configuredModel) {
+                // The configured model is loaded and ready. This is the only
+                // success state — the pill name shows the exact model that
+                // will be sent into the debate.
+                openAICompatibleStatus = .ok("\(presetName) · \(configuredModel) ready")
+            } else {
+                // Server is reachable but the typed model isn't loaded. Show
+                // what IS available so the user can fix the typo or load the
+                // model in their server.
+                let preview = availableIds.prefix(3).joined(separator: ", ")
+                let suffix = availableIds.count > 3 ? "…" : ""
+                openAICompatibleStatus = .failed("'\(configuredModel)' not loaded on \(presetName). Available: \(preview)\(suffix)")
+            }
         } catch {
             openAICompatibleStatus = .failed(error.localizedDescription)
         }
