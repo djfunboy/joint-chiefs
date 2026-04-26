@@ -1,7 +1,7 @@
 # Joint Chiefs — Value Proposition
 
-**Version:** 2.1
-**Last Updated:** 2026-04-20
+**Version:** 2.2
+**Last Updated:** 2026-04-26
 
 **Website:** [jointchiefs.ai](https://jointchiefs.ai/) (live)
 **Repo:** [github.com/djfunboy/joint-chiefs](https://github.com/djfunboy/joint-chiefs) (public, MIT)
@@ -10,13 +10,14 @@
 
 **An MCP server for multi-model code review — with structured debate, not just a vote.**
 
-Joint Chiefs is an MCP server that runs your code past OpenAI, Gemini, Grok, and Claude in parallel, then makes them argue. Findings are challenged across multiple debate rounds until positions converge, then a moderator model writes a single anonymized consensus summary. The protocol is grounded in Multi-Agent Debate (MAD) research (Liang et al., 2023, [arXiv:2305.19118](https://arxiv.org/abs/2305.19118)), which shows adversarial collaboration between LLMs beats both single-model inference and single-model self-reflection on factuality and reasoning.
+Joint Chiefs is an MCP server that runs your code past OpenAI, Anthropic, Gemini, and Grok in parallel — plus any local model you point it at via Ollama or an OpenAI-compatible server (LM Studio, Jan, llama.cpp-server, Msty, LocalAI) — then makes them argue. Findings are challenged across multiple debate rounds until positions converge, then a moderator model writes a single anonymized consensus summary. The protocol is grounded in Multi-Agent Debate (MAD) research (Liang et al., 2023, [arXiv:2305.19118](https://arxiv.org/abs/2305.19118)), which shows adversarial collaboration between LLMs beats both single-model inference and single-model self-reflection on factuality and reasoning.
 
-Ships as three surfaces, one project:
+Ships as three user-facing surfaces plus one trust-anchor binary, one project:
 
-- **MCP server** — the primary integration. Drop it into any MCP-aware client. The host LLM calls `joint_chiefs_review` and gets back a consensus.
+- **MCP server** (`jointchiefs-mcp`) — the primary integration. Drop it into any MCP-aware client. The host LLM calls `joint_chiefs_review` and gets back a consensus.
 - **CLI** (`jointchiefs`) — for setup, debugging, headless use, and CI pipelines. Same engine, scriptable.
-- **macOS setup app** — one-shot installer GUI. Enter API keys with live test buttons, copy a standard MCP config snippet, configure debate strategy, and let it install the CLI and MCP binaries to the right places.
+- **macOS setup app** (`jointchiefs-setup`) — one-shot installer GUI. Five sections: How to Use, API Keys (with live test buttons + curated model picker), Roles & Weights, MCP Config (with a "Configured AI tools" panel that scans your home dir for MCP-aware clients), and Privacy. CLI binaries install silently on first launch.
+- **Keygetter** (`jointchiefs-keygetter`) — the only signed binary allowed to read/write Joint Chiefs' Keychain items. The other three call it via `Process`. You'll never run it directly; it exists to keep your API keys behind a single ACL boundary.
 
 ## Problem Statement
 
@@ -48,15 +49,16 @@ You care about *how* the models arrive at a conclusion. Full transcripts are wri
 4. **"Research-backed."** Adaptive break, tit-for-tat engagement, judge arbitration — straight from the MAD literature. We cite the paper because it matters.
 5. **"Updates itself."** Sparkle for the app bundle — the setup app auto-updates and re-installs the bundled CLI + MCP binaries from `Contents/Resources/`. No custom updater, no surprise background processes.
 
-## The Three Surfaces
+## The Surfaces
 
-Each surface uses the same `JointChiefsCore` engine. Pick the one your workflow needs.
+The three user-facing binaries share the same `JointChiefsCore` engine. The keygetter is the trust anchor they all call into. Pick the one your workflow needs.
 
 | Surface | When to use it | What it gives you |
 |---|---|---|
 | **MCP server** | Daily review from inside any MCP host | Tool-call invocation, host LLM passes code, consensus comes back inline |
 | **CLI** (`jointchiefs`) | Pre-commit hooks, CI, scripting, debugging a stuck debate, one-off audits | Streaming SSE output, JSON mode, exit codes, stdin piping |
-| **macOS setup app** | First install, key rotation, debate strategy tweaks | Live API key tests, standard MCP config snippet, moderator/consensus/tiebreaker config, bundles and installs the CLI + MCP binaries |
+| **macOS setup app** | First install, key rotation, debate strategy tweaks, MCP wire-up verification | Live API key tests, curated model picker, standard MCP config snippet, moderator/consensus/tiebreaker config, "Configured AI tools" wire-up status, silent CLI install on first launch |
+| **Keygetter** (under the hood) | Never directly | Sole Keychain ACL identity — the other binaries `Process`-spawn it for every key read/write |
 
 The app is not required to use the product. The CLI is not required to use the MCP server. The MCP server is not required to use the CLI. Pick one, two, or all three.
 
@@ -126,10 +128,10 @@ Joint Chiefs is an MCP server that runs your code past OpenAI, Gemini, Grok, and
 
 ### Key benefit bullets (for above-the-fold)
 
-- **Five providers, one consensus** — OpenAI, Gemini, Grok, Claude, Ollama
+- **Six providers, one consensus** — OpenAI, Anthropic, Gemini, Grok, plus two local options (Ollama and any OpenAI-compatible server like LM Studio / Jan / llama.cpp-server)
 - **Structured debate, not majority vote** — built on MAD protocol research
 - **Drops into your AI client** — MCP server, works with any MCP-aware host
-- **One-click setup** — macOS app installs everything, validates every key
+- **One-click setup** — macOS app installs everything silently, validates every key, scans for MCP-aware clients to confirm wire-up
 - **Auto-updates** — Sparkle for the app bundle (re-installs bundled CLI + MCP binaries)
 - **Local-only** — no telemetry, no servers, your code never leaves your machine except to the providers you chose
 
@@ -148,3 +150,4 @@ Joint Chiefs is an MCP server that runs your code past OpenAI, Gemini, Grok, and
 | 1.0 | 2026-04-08 | Initial value proposition (CLI-only product) |
 | 2.0 | 2026-04-16 | Reframed for v2 launch under jointchiefs.ai. Lead with MCP server framing. Documented three-surface product (MCP / CLI / setup app). Sharpened MAD-vs-vote-based-consensus pitch with explicit research citation. Updated competitive table for 2026 ecosystem (Zen MCP, Second Opinion variants, mcp-sage, pal-mcp-server, multi_mcp). Dropped deferred menu bar app. Added website-ready material: tagline, headline candidates, CTA copy, key benefit bullets. |
 | 2.1 | 2026-04-20 | Website + repo links added to header. Corrected the "updates itself" messaging across Key Messages, Feature Benefits, and key-benefit bullets — aligned with the lean-baseline direction (Sparkle for the app bundle only; no custom EdDSA-signed updater for the CLI/MCP binaries). |
+| 2.2 | 2026-04-26 | Reconciled provider count and surface count with shipping reality. Bumped "five providers" → six in the lead pitch and key-benefit bullets — adds the v0.4.0 OpenAI-compatible support (LM Studio, Jan, llama.cpp-server, Msty, LocalAI) as a second local-model option alongside Ollama. Reframed "three surfaces" → three user-facing surfaces plus the keygetter as a trust-anchor binary, matching how PRD / ARCHITECTURE / CLAUDE.md describe it. The Surfaces table grew a Keygetter row noting users never invoke it directly. Setup-app description bullet now lists the five sections in display order (How to Use, API Keys, Roles & Weights, MCP Config, Privacy) and notes the silent first-launch CLI install + "Configured AI tools" wire-up panel. |

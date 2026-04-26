@@ -1,7 +1,7 @@
 # Joint Chiefs — Design System
 
-**Version:** 1.1
-**Last Updated:** 2026-04-20
+**Version:** 1.2
+**Last Updated:** 2026-04-26
 **Source of truth:** [Agentdeck design system](https://ui-engine-gallery.netlify.app/agentdeck/design-system)
 **Companion:** [`../../Joint Chiefs Website/docs/DESIGN-SYSTEM.md`](../../Joint%20Chiefs%20Website/docs/DESIGN-SYSTEM.md) — same tokens, CSS implementation
 
@@ -343,11 +343,11 @@ Map the Agentdeck components onto existing setup app views:
 
 | View | Agentdeck pattern |
 |---|---|
-| `DisclosureView` | Prose with system sans (title/subtitle), mono body, bullet list, single primary button at bottom |
-| `KeysView` | Inputs with dashed warm-tan focus, per-provider row (mono name + Test/Save/Delete ghost buttons + success pill when validated) |
+| `UsageView` (How to Use) | Prose with system sans (title/subtitle), mono body, code-block panels for AI prompt + CLI examples with ghost Copy buttons, single primary button at bottom |
+| `KeysView` | Inputs with dashed warm-tan focus, per-provider row (mono name + Save/Test/Delete buttons + success/testing/error pill), curated top-5 model picker as `AgentChip` group |
 | `RolesWeightsView` | Panel headers (uppercase mono 12pt), Picker with chip-style variants, sliders with mono value labels |
-| `InstallView` | Workspace-row-like destination picker, primary button, `agentBgUncommitted` tint when dirty, `agentBgReady` tint when installed |
-| `MCPConfigView` | Code block with the standard snippet, ghost "Copy" button top-right in the block, validation success pill |
+| `MCPConfigView` | Code block with the standard snippet, ghost "Copy" button top-right in the block, "Configured AI tools" panel with per-tool status pills |
+| `DisclosureView` (Privacy) | Prose with system sans (title/subtitle), mono body, bullet list, no primary button (terminal screen of the wizard) |
 
 ## What NOT to do
 

@@ -1,20 +1,22 @@
 # Joint Chiefs — Architecture
 
-**Version:** 1.5
-**Last Updated:** 2026-04-25
+**Version:** 1.6
+**Last Updated:** 2026-04-26
 
 **Website:** [jointchiefs.ai](https://jointchiefs.ai/) — deployed via Netlify. Source in the private `djfunboy/joint-chiefs-website` repo.
 **App repo:** [github.com/djfunboy/joint-chiefs](https://github.com/djfunboy/joint-chiefs) (public, MIT).
 
 ## System Overview
 
-Joint Chiefs uses a **hub-and-spoke** debate model. The "generals" (OpenAI,
-Gemini, Grok, Ollama) each review the code independently and send their
-findings to Claude, who acts as the moderator/hub. Claude synthesizes the
+Joint Chiefs uses a **hub-and-spoke** debate model. The "generals" (any of
+OpenAI, Gemini, Grok, Ollama, or an OpenAI-compatible local server such as
+LM Studio / Jan / llama.cpp-server / Msty / LocalAI) each review the code
+independently and send their findings to the moderator (Claude by default,
+configurable via `StrategyConfig.moderator`). The moderator synthesizes the
 round's findings, sends the anonymized synthesis back to the generals for
 the next round, and — once consensus is reached or max rounds hit — writes
 the final summary. A code-based `ConsensusBuilder` is available as a
-fallback if Claude is unavailable.
+fallback if the moderator is unavailable.
 
 ```
 ┌──────────────────────────┐
@@ -28,17 +30,17 @@ fallback if Claude is unavailable.
              │
              │  Round N: fan out to generals
              ▼
-  ┌──────────────────────────────────────────┐
-  │  Generals (independent, parallel review) │
-  │                                          │
-  │  ┌──────┐ ┌──────┐ ┌────┐ ┌──────┐       │
-  │  │OpenAI│ │Gemini│ │Grok│ │Ollama│       │
-  │  └──┬───┘ └──┬───┘ └─┬──┘ └──┬───┘       │
-  └─────┼────────┼───────┼───────┼───────────┘
-        │        │       │       │
-        └────────┴───┬───┴───────┘
-                     │  Reports
-                     ▼
+  ┌─────────────────────────────────────────────────────┐
+  │  Generals (independent, parallel review)            │
+  │                                                     │
+  │  ┌──────┐ ┌──────┐ ┌────┐ ┌──────┐ ┌─────────────┐  │
+  │  │OpenAI│ │Gemini│ │Grok│ │Ollama│ │OpenAI-compat│  │
+  │  └──┬───┘ └──┬───┘ └─┬──┘ └──┬───┘ └──────┬──────┘  │
+  └─────┼────────┼───────┼───────┼─────────────┼────────┘
+        │        │       │       │             │
+        └────────┴───────┼───────┴─────────────┘
+                         │  Reports
+                         ▼
            ┌───────────────────┐
            │ Claude (moderator)│
            │                   │
@@ -94,14 +96,17 @@ JointChiefs/
 │   │       ├── ProviderFactory.swift        (panel assembly; filters `weight == 0`; moderator/tiebreaker builders)
 │   │       ├── ConsensusBuilder.swift
 │   │       ├── DebateOrchestrator.swift
-│   │       └── Providers/  (OpenAI, Gemini, Grok, Anthropic, Ollama — each exposes providerType)
+│   │       └── Providers/  (OpenAI, Anthropic, Gemini, Grok, Ollama, OpenAICompatible — each exposes providerType)
 │   ├── JointChiefsCLI/                       (executable: jointchiefs)
 │   ├── JointChiefsMCP/                       (executable: jointchiefs-mcp — stdio only)
 │   ├── JointChiefsKeygetter/                 (executable: jointchiefs-keygetter)
 │   └── JointChiefsSetup/                     (executable: jointchiefs-setup — SwiftUI one-shot installer)
 │       ├── SetupApp.swift                   (@main, AppKit delegate for foreground activation)
-│       ├── Model/SetupModel.swift           (@Observable @MainActor state; probes Keychain on launch)
-│       └── Views/                           (DisclosureView, KeysView, RolesWeightsView, InstallView, MCPConfigView)
+│       ├── Model/
+│       │   ├── SetupModel.swift             (@Observable @MainActor state; probes Keychain + silent CLI install on launch)
+│       │   ├── UpdaterService.swift         (Sparkle wrapper; drives sidebar update-status footer)
+│       │   └── MCPConfigScanner.swift       (generic MCP-server detector for the "Configured AI tools" panel)
+│       └── Views/                           (RootView, UsageView, KeysView, RolesWeightsView, MCPConfigView, DisclosureView)
 └── Tests/JointChiefsCoreTests/
 ```
 
@@ -172,27 +177,50 @@ client owning our stdio by definition.
 ### Setup App
 
 Single-window SwiftUI executable (`jointchiefs-setup`) that onboards users
-without requiring shell surgery. Five sections, navigable via a sidebar:
+without requiring shell surgery. Five sections, navigable via a sidebar
+(in display order):
 
-- **Data Handling** — first-run disclosure: what's sent to providers, what
-  stays local, what the app refuses to do (no telemetry, no analytics).
+- **How to Use** — first screen. Orients the user to what Joint Chiefs is —
+  a panel of LLMs that debate a code review and produce one consensus
+  summary — and shows exactly how to invoke it from a terminal or any AI
+  client with MCP configured. Includes the natural-language AI prompt and
+  CLI invocation examples with Copy buttons.
 - **API Keys** — masked entry per provider. Save writes to the Keychain via
   `APIKeyResolver.writeViaKeygetter`; Test resolves the key and runs
   `ReviewProvider.testConnection()`; Delete calls
-  `APIKeyResolver.deleteViaKeygetter`. Ollama is shown read-only.
+  `APIKeyResolver.deleteViaKeygetter`. Each provider row has a Model picker
+  driven by `ProviderType.availableModels` (top 5 curated). Ollama and any
+  OpenAI-compatible local server (LM Studio, Jan, llama.cpp-server, Msty,
+  LocalAI) are configured here too — both are independent and can run side
+  by side.
 - **Roles & Weights** — moderator picker, tiebreaker picker, consensus-mode
   picker, rounds and timeout sliders, per-provider weight sliders (0 = excluded
   from panel, 1.0 = default vote, up to 3.0 = triple vote). Dirty-state
   indicator plus an explicit Save action persisting to
   `StrategyConfigStore.save(_:)`.
-- **Install** — destination picker (Homebrew prefix if writable, `~/.local/bin`
-  fallback, custom via `NSOpenPanel`), PATH detection, and a button that copies
-  `jointchiefs`, `jointchiefs-mcp`, and `jointchiefs-keygetter` into the chosen
-  directory with `0o755` perms.
 - **MCP Config** — generates a standard `mcpServers` JSON snippet that points
   at the installed `jointchiefs-mcp` path. Works with any MCP client. No key
   material in the snippet — keys live in the Keychain, resolved at tool-call
-  time.
+  time. The "Configured AI tools" panel (v0.5.0) walks home-dir conventional
+  config locations, structurally confirms each MCP-server stanza, and reports
+  per-tool wire-up status with a "wired in M of N" pill. Detection is by
+  stanza shape (JSON `mcpServers` map, TOML `[mcp_servers...]` table) — never
+  by client name.
+- **Privacy** — last screen. Data-handling disclosure: what's sent to
+  providers, what stays local, what the app refuses to do (no telemetry, no
+  analytics). MIT-licensed link to the public repo.
+
+CLI binaries (`jointchiefs`, `jointchiefs-mcp`, `jointchiefs-keygetter`) are
+installed silently into `/opt/homebrew/bin` (or `~/.local/bin` fallback) on
+first launch via `SetupModel.installCLIIfNeeded()` — no manual destination
+picker, no install button. Keeps the wizard focused on configuration, not
+file copying.
+
+The sidebar footer (v0.5.0) shows the currently-running app version and a
+Sparkle-driven "Check for updates" / "update available" affordance with an
+inline spinner during user-triggered checks. `UpdaterService` skips Sparkle
+init when running outside an app bundle so dev builds via `swift run` don't
+hit the "updater failed to start" modal.
 
 The setup app talks to the Keychain *only* through the keygetter for the same
 reason the CLI and MCP server do — see the keygetter section below. It does
@@ -300,9 +328,10 @@ streaming rather than waiting for the full response body.
   actively responding even during long generations — useful both for CLI
   output and for orchestration logic that otherwise can't distinguish
   "slow" from "dead."
-- **Consistent across providers.** OpenAI, Gemini, Grok, Anthropic, and
-  Ollama all stream through the same `AsyncStream<ReviewChunk>` shape,
-  so the orchestrator doesn't need provider-specific buffering logic.
+- **Consistent across providers.** OpenAI, Anthropic, Gemini, Grok, Ollama,
+  and any OpenAI-compatible server all stream through the same
+  `AsyncStream<ReviewChunk>` shape, so the orchestrator doesn't need
+  provider-specific buffering logic.
 
 ## Configuration
 
@@ -345,8 +374,10 @@ for enum-keyed dictionaries. See the custom `init(from:)` / `encode(to:)` in
 | `GROK_MODEL` | Grok model override | `grok-3` |
 | `ANTHROPIC_API_KEY` | Anthropic authentication — also serves as deciding model | (required to enable Claude) |
 | `ANTHROPIC_MODEL` | Claude model override | `claude-opus-4-6` |
-| `OLLAMA_ENABLED` | Set to `1` to include local Ollama models | off |
+| `OLLAMA_ENABLED` | Set to `1` to force-include / `0` to force-exclude the local Ollama general (overrides `StrategyConfig.ollama.enabled`) | unset (use `StrategyConfig`) |
 | `OLLAMA_MODEL` | Ollama model override | `llama3` |
+| `OPENAI_COMPATIBLE_BASE_URL` | Force-enable an OpenAI-compatible local server (LM Studio, Jan, llama.cpp-server, Msty, LocalAI). CI override for `StrategyConfig.openAICompatible`. | unset |
+| `OPENAI_COMPATIBLE_MODEL` | Model identifier as the local server exposes it | unset |
 | `CONSENSUS_MODEL` | Override the Claude model used for consensus synthesis | falls back to `ANTHROPIC_MODEL` |
 
 Claude (via `ANTHROPIC_API_KEY`) plays a dual role: it reviews code as one
@@ -388,14 +419,16 @@ Claude model for per-round reviews and a larger one for the final call.
 - **Xcode 16+** with Swift 6
 - **macOS 15+** for development and deployment
 - **Swift Package Manager** for dependencies
-- **Dependencies:** Hummingbird, Swift ArgumentParser, SwiftData (system)
+- **Dependencies:** `swift-argument-parser` (CLI flags), `modelcontextprotocol/swift-sdk` (pinned exact `0.12.0` — MCP stdio), `Sparkle` (auto-update for the app bundle)
 
 ## Distribution
 
 - **App repo:** public at [github.com/djfunboy/joint-chiefs](https://github.com/djfunboy/joint-chiefs) — MIT licensed.
-- **Website:** [jointchiefs.ai](https://jointchiefs.ai/) — static HTML + shared `styles.css`, Agentdeck palette matching the setup app. Hosted on Netlify (site ID `79794bf5-ed42-41bb-9610-a6cd57a79a12`); source is a separate private repo (`djfunboy/joint-chiefs-website`). Netlify manages the apex domain + `www` alias + Let's Encrypt cert.
-- **Release artifact** (pending): notarized DMG containing `Joint Chiefs.app`. The Sparkle appcast feed lives at `jointchiefs.ai/appcast.xml` (placeholder until first notarized release).
-- **Auto-update path:** Sparkle for the app bundle. No custom updater for the CLI or MCP binaries — a fresh `brew install` (once the tap is live) or a re-run of the setup app picks up new versions.
+- **Website:** [jointchiefs.ai](https://jointchiefs.ai/) — static HTML + shared `styles.css`, Agentdeck palette matching the setup app. Hosted on Netlify; source is a separate private repo (`djfunboy/joint-chiefs-website`) with auto-deploy on push to main. Netlify manages the apex domain + `www` alias + Let's Encrypt cert.
+- **Release artifact:** notarized + stapled DMG containing `Joint Chiefs.app` with the four binaries in `Contents/Resources/` (CLI/MCP/keygetter) and `Contents/MacOS/jointchiefs-setup`. Shipped through v0.5.0; SHA-256 wired into `Casks/joint-chiefs.rb`.
+- **Sparkle appcast** at [jointchiefs.ai/appcast.xml](https://jointchiefs.ai/appcast.xml) — EdDSA-signed entries for v0.1.0 → v0.5.0.
+- **Auto-update path:** Sparkle for the app bundle. The `UpdaterService` wrapper drives the sidebar update-status footer. No custom updater for the CLI or MCP binaries — Sparkle replaces the bundle and the bundled binaries get re-installed via `SetupModel.installCLIIfNeeded()` on next launch. A fresh `brew install --cask joint-chiefs` (homebrew tap pending) achieves the same.
+- **Build scripts:** `scripts/build-app.sh` (Release build + bundle assembly + Sparkle.framework copy + `install_name_tool` rpath patch + Developer ID signing), `scripts/build-dmg.sh` (DMG creation + notarization submit + staple), `scripts/generate-icon.sh` (icon `.icns` from PDF source).
 
 ## Revision History
 
@@ -407,3 +440,4 @@ Claude model for per-round reviews and a larger one for the final call.
 | 1.3 | 2026-04-19 | Added the `JointChiefsSetup` SwiftUI target (`jointchiefs-setup`) with Disclosure / Keys / Roles-&-Weights / Install / MCP-Config sections; the setup app goes through `APIKeyResolver.writeViaKeygetter` / `deleteViaKeygetter` rather than linking Keychain directly. Documented `StrategyConfig.providerWeights` and the weighted-voting path in `DebateOrchestrator.applyConsensusMode`. `ReviewProvider` now exposes `providerType` so the orchestrator can map a provider instance to its configured weight. |
 | 1.4 | 2026-04-20 | Added website + repository references to the header, plus a new Distribution section documenting the Netlify deployment of jointchiefs.ai (site id, domain aliases, Sparkle appcast location). Corrected the auto-update description to match the lean baseline — Sparkle for the app bundle only, no custom updater for CLI/MCP binaries. |
 | 1.5 | 2026-04-25 | Reconciled the Tech Stack and DebateOrchestrator sections with shipping reality — replaced the "Menu bar app, settings, transcript viewer" stack row with the four shipped surfaces (setup app, CLI, MCP server, keygetter); replaced "SwiftData persistence" with `StrategyConfig` JSON + local transcript files (SwiftData remains reserved for the deferred menu bar app). Bumped default debate rounds from 2 → 5 with adaptive early-break. Removed the "setup app is deferred" line above the project tree. Data-flow note flipped from "CLI or HTTP" to "CLI invocation or MCP tool call." |
+| 1.6 | 2026-04-26 | Reconciled v0.4.0 + v0.5.0 changes that drifted from the doc. Added the 6th provider type (`openAICompatible` — LM Studio / Jan / llama.cpp-server / Msty / LocalAI) to the System Overview, ASCII diagram, project tree, streaming-providers list, and configuration env-var table. Rewrote the Setup App section: five sections are now Usage / Keys / Roles & Weights / MCP Config / Privacy (Install pane was replaced by silent auto-install in v0.3.0; "How to Use" is the new first screen; "Privacy" is the renamed Disclosure). Documented the v0.5.0 "Configured AI tools" panel and sidebar update-status footer with `MCPConfigScanner` and `UpdaterService`. Fixed the Development Environment dependencies line — removed Hummingbird and SwiftData (never landed / not used), listed the actual three deps from `Package.swift`. Distribution section reflects shipped state: notarized DMGs through v0.5.0, Sparkle appcast live, build-script trio (`build-app.sh`, `build-dmg.sh`, `generate-icon.sh`). |

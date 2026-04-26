@@ -1,7 +1,7 @@
 # Joint Chiefs — Build Plan
 
-**Version:** 1.6
-**Last Updated:** 2026-04-25
+**Version:** 1.7
+**Last Updated:** 2026-04-26
 
 ## What's Built
 
@@ -13,13 +13,15 @@ progress: CLI, stdio MCP server, and (still to come) a setup app.
 - **Keygetter** (`jointchiefs-keygetter`) — single signed binary authoritative over Keychain access
 - **`APIKeyResolver`** — env var first (CI fallback), then keygetter; CLI and MCP both funnel through it
 - **`StrategyConfig` + `StrategyConfigStore`** — moderator, consensus mode, tiebreaker, rounds, timeouts, rate limits, persisted to `~/Library/Application Support/Joint Chiefs/strategy.json`
-- **5 providers live:** OpenAI, Gemini, Grok, Anthropic Claude, Ollama — all SSE-streamed
-- **Hub-and-spoke debate:** OpenAI / Gemini / Grok are spokes, Claude is moderator/decider; adaptive early break on convergence
+- **6 providers live:** OpenAI, Anthropic Claude, Gemini, Grok, Ollama, OpenAI-compatible (LM Studio / Jan / llama.cpp-server / Msty / LocalAI) — all SSE-streamed. Local options run side by side; Anthropic plays dual role as the default moderator and an optional spoke.
+- **Hub-and-spoke debate:** any provider can spoke; the moderator (Claude by default, configurable via `StrategyConfig.moderator`) synthesizes anonymized findings each round; adaptive early break on convergence
 - **Anonymous synthesis:** model identities stripped before the deciding model writes the final decision
 - **Four consensus modes wired through `DebateOrchestrator`:** `moderatorDecides`, `strictMajority`, `bestOfAll`, `votingThreshold` — with weighted voting when `providerWeights` is configured
 - **Per-provider weighting:** `StrategyConfig.providerWeights` drives panel inclusion (weight 0 = excluded) and voting-threshold math; surfaced in the setup app
-- **Setup app scaffold:** `jointchiefs-setup` SwiftUI executable target with Disclosure / Keys / Roles-&-Weights / Install / MCP-Config screens — all five views migrated to Agentdeck tokens (`agentBgPanel`, `agentDialogTitle`, `AgentInputStyle`, `AgentPill`, `AgentChip`, `agentPanel`, `.agentPrimary` / `.agentSecondary` / `.agentDanger` button styles)
-- **Website live at [jointchiefs.ai](https://jointchiefs.ai/)** — static site deployed via Netlify. Source in the private `djfunboy/joint-chiefs-website` repo. Custom domain + Let's Encrypt cert configured.
+- **Per-provider model override:** `StrategyConfig.providerModels` lets users pick from `ProviderType.availableModels` (curated top 5 per provider) — resolution priority `providerModels[type]` > env var > `ProviderType.defaultModel`
+- **Setup app:** `jointchiefs-setup` SwiftUI executable shipping its full five-section installer — Usage / Keys / Roles & Weights / MCP Config / Privacy. All views use Agentdeck tokens (`agentBgPanel`, `AgentInputStyle`, `AgentPill`, `AgentChip`, `agentPanel`, `.agentPrimary` / `.agentSecondary` / `.agentDanger` button styles). CLI binaries install silently into `/opt/homebrew/bin` (or `~/.local/bin` fallback) on first launch — no manual destination picker.
+- **Website live at [jointchiefs.ai](https://jointchiefs.ai/)** — static site deployed via Netlify with auto-deploy on push to main. Source in the private `djfunboy/joint-chiefs-website` repo. Custom domain + Let's Encrypt cert configured.
+- **Six releases shipped:** v0.1.0 → v0.2.0 → v0.3.0 → v0.3.1 → v0.4.0 → v0.5.0. Notarized + stapled DMGs through v0.5.0; Sparkle appcast + Homebrew cask SHA wired.
 - **80 tests passing** (unit + orchestrator integration + consensus-mode coverage + weighted-voting + APIKeyResolver with fake-keygetter harness)
 
 Phases 1–3, 5, 8, and 10 are complete. Phase 6 (setup app) ships its full
@@ -62,19 +64,20 @@ no YubiKey, no custom updater, no XPC.
 
 ## Phase 2: Additional Providers ✅ COMPLETE
 
-**Goal:** All planned providers implemented and tested. **Scope expanded** — added Anthropic direct on top of the original three, so 5 providers ship (including Ollama).
+**Goal:** All planned providers implemented and tested. **Scope expanded twice** — Anthropic added on top of the original three for the debate moderator role; OpenAI-compatible added in v0.4.0 as a second local-model option alongside Ollama.
 
 **Steps:**
 1. ✅ Implement `GeminiProvider` (Google AI API)
 2. ✅ Implement `GrokProvider` (xAI API)
-3. ✅ Implement `OllamaProvider` (local models, opt-in via `OLLAMA_ENABLED=1`)
+3. ✅ Implement `OllamaProvider` (local models, opt-in via `OLLAMA_ENABLED=1` or `StrategyConfig.ollama.enabled`)
 4. ✅ Implement `AnthropicProvider` (added — Claude also moderates the debate)
-5. ✅ Add provider factory/registry for dynamic provider creation from env vars
-6. ✅ Write tests for each provider
-7. ✅ Add SSE streaming to every provider
+5. ✅ Implement `OpenAICompatibleProvider` (v0.4.0 — covers LM Studio, Jan, llama.cpp-server, Msty, LocalAI; configured via `StrategyConfig.openAICompatible` or `OPENAI_COMPATIBLE_BASE_URL`)
+6. ✅ Add provider factory/registry for dynamic provider creation from env vars
+7. ✅ Write tests for each provider
+8. ✅ Add SSE streaming to every provider
 
 **Checkpoint:**
-- [x] All 5 providers build and pass tests
+- [x] All 6 providers build and pass tests
 - [x] Provider registry creates providers from environment configuration
 - [x] Each provider handles errors gracefully (timeout, auth failure, rate limit)
 - [x] All providers stream tokens via SSE
@@ -139,7 +142,7 @@ no YubiKey, no custom updater, no XPC.
 
 ---
 
-## Phase 6: Setup App 🟢 SCAFFOLD + DESIGN-SYSTEM MIGRATION COMPLETE
+## Phase 6: Setup App 🟢 COMPLETE
 
 **Goal:** Single-window SwiftUI app that lets end users add API keys and pick a
 strategy without touching env vars or the CLI. One-shot installer pattern —
@@ -152,24 +155,24 @@ surface that writes keys to the Keychain (via the keygetter) and persists
 `StrategyConfig`.
 
 **Steps:**
-1. ✅ `StrategyConfig` type defined in `JointChiefsCore` — now includes `providerWeights`
+1. ✅ `StrategyConfig` type defined in `JointChiefsCore` — includes `providerWeights`, `providerModels`, `ollama`, `openAICompatible`, `rateLimits`
 2. ✅ `StrategyConfigStore` load/save helpers
 3. ✅ `APIKeyResolver` consumed by CLI + MCP (no direct env reads in hot paths); `writeViaKeygetter` / `deleteViaKeygetter` added for the setup app
 4. ✅ `jointchiefs-keygetter` executable as the sole Keychain identity
-5. ✅ SwiftUI app target (`jointchiefs-setup`): provider-keys screen with masked entry, Save, Test, and Delete per key
-6. ✅ Roles & Weights panel: moderator picker, tiebreaker picker, consensus-mode picker, per-provider weight sliders (0 = excluded, >0 = voting weight), rounds/timeout sliders, voting-threshold slider
-7. ✅ Install-location picker (default `/opt/homebrew/bin`, fallback `~/.local/bin`, custom via NSOpenPanel) — copies all three CLI binaries
-8. ✅ PATH-on-install helper (detects destination on `$PATH`, shows the exact `export` line when missing)
-9. ✅ MCP config snippet generator (keyless — reads destination path, outputs a standard `mcpServers` JSON block with a Copy button)
-10. ✅ First-run data-handling disclosure screen (what is sent off-device, what stays local, what the app doesn't do)
-11. ✅ All five views migrated to the Agentdeck design system — tokens in `JointChiefsSetup/DesignSystem/` (AgentdeckTokens, AgentdeckTypography, AgentdeckButtonStyle, AgentdeckComponents). No hex/CGFloat literals in any view. Components added: `AgentInputStyle` ViewModifier (dashed warm-tan focus), `agentPanel` View modifier, `AgentPill` (tinted status), `AgentChip` (picker replacement), `AgentSectionHeader` (uppercase eyebrow).
+5. ✅ SwiftUI app target (`jointchiefs-setup`): provider-keys screen with masked entry, Save, Test, and Delete per key, plus a curated top-5 model picker per provider (`ProviderType.availableModels`)
+6. ✅ Roles & Weights panel: moderator picker, tiebreaker picker, consensus-mode picker, per-provider weight sliders (0 = excluded, >0 = voting weight), rounds/timeout sliders, voting-threshold slider, Ollama and OpenAI-compatible local-model configuration
+7. ✅ Silent CLI install on first launch (v0.3.0) — `SetupModel.installCLIIfNeeded()` copies `jointchiefs`, `jointchiefs-mcp`, and `jointchiefs-keygetter` into `/opt/homebrew/bin` (or `~/.local/bin` fallback) at `RootView.task` time. Replaced the earlier Install pane with a "How to Use" first-screen orientation view.
+8. ✅ PATH detection — surfaced inline when the destination isn't on `$PATH`
+9. ✅ MCP config snippet generator (keyless — reads destination path, outputs a standard `mcpServers` JSON block with a Copy button) plus a natural-language AI prompt that any MCP-aware AI client can paste to wire itself up
+10. ✅ First-run data-handling disclosure screen ("Privacy") — what is sent off-device, what stays local, what the app doesn't do, MIT-licensed link to the public repo
+11. ✅ All five views migrated to the Agentdeck design system — tokens in `JointChiefsSetup/DesignSystem/` (AgentdeckTokens, AgentdeckTypography, AgentdeckButtonStyle, AgentdeckComponents). No hex/CGFloat literals in any view. Components added: `AgentInputStyle` ViewModifier (dashed warm-tan focus), `agentPanel` View modifier, `AgentPill` (tinted status), `AgentChip` (picker replacement), `AgentSectionHeader` (uppercase eyebrow), `SetupPage` scaffold (sticky-footer page wrapper).
 12. ✅ "Configured AI tools" panel in MCPConfigView (v0.5.0). `MCPConfigScanner` walks home-dir conventional config locations (top-level dotfiles, `~/.<dir>/<file>`, `~/.config/<dir>/<file>`, `~/Library/Application Support/<dir>/<sub>/<file>`) and reports each MCP-server config it finds with structural confirmation (JSON `mcpServers` map, TOML `[mcp_servers...]` table) plus a Joint Chiefs entry-presence check. Pill summarizes "wired in M of N." Refresh button + on-appear `.task` keep it current. Stays generic: detection is by stanza shape, never by client name.
+13. ✅ Sidebar update-status footer (v0.5.0). `UpdaterService` wraps Sparkle and surfaces the currently-running version + a "Check for updates" / "update available" affordance with inline spinner during user-triggered checks. Skips Sparkle init when running outside an app bundle.
 
-**Remaining before distribution (tracked under Phase 10):**
-- App icon (`Resources/AppIcon.icns` + `CFBundleIconFile`). The bundle is functional without one; Finder just shows a generic icon.
-- Code signing (`codesign --sign <Developer ID>`) on the four binaries, with `jointchiefs-keygetter` signed with `--identifier com.jointchiefs.keygetter` per the Keychain-ACL design.
-- Notarization + stapling of the DMG artifact.
-- End-to-end test of the key-write path against a real Keychain — currently smoke-tested via the keygetter's own exit-code contract.
+**Remaining (tracked under Phase 9):**
+- VoiceOver + Dynamic Type pass on all five sections (tokens + traits are wired; needs a live screen-reader smoke test)
+- Real-Keychain end-to-end round-trip test — currently smoke-tested via the keygetter's own exit-code contract
+- Pre-flight validation: warn or disable Save when a provider is picked as moderator without a saved API key (still open from 04-23 UX review)
 
 **Build script** — `scripts/build-app.sh` runs `swift build -c release` and assembles `build/Joint Chiefs.app`:
 
@@ -184,10 +187,10 @@ Joint Chiefs.app/
         └── jointchiefs-keygetter        (APIKeyResolver.locateKeygetter finds it here)
 ```
 
-`APIKeyResolver` and `InstallView` both do bundle-aware path discovery so the
-keygetter and CLI sources are found via `Contents/Resources/` when the setup
-app runs from the bundle, and via flat-sibling when it runs from
-`.build/release/` during development.
+`APIKeyResolver` and `SetupModel.installCLIIfNeeded()` both do bundle-aware
+path discovery so the keygetter and CLI sources are found via
+`Contents/Resources/` when the setup app runs from the bundle, and via
+flat-sibling when it runs from `.build/release/` during development.
 
 ---
 
@@ -292,3 +295,4 @@ reversed in favor of the standard Apple Developer flow.
 | 1.4 | 2026-04-20 | Phase 6 step 11 complete: all five setup-app views migrated to Agentdeck tokens. `AgentdeckComponents.swift` added — `AgentInputStyle`, `agentPanel`, `AgentPill`, `AgentChip`, `AgentSectionHeader`. Phase 10 steps 3–4 complete: public app repo live at `github.com/djfunboy/joint-chiefs`, website shipped to `jointchiefs.ai` via Netlify (custom domain + SSL). Phase 9 step 6 complete: README + CLAUDE.md + all docs synced to four-surface reality and current test counts. Phase 9 checkpoint test count corrected 52 → 60. |
 | 1.5 | 2026-04-25 | Phase 10 marked 🟢 COMPLETE — steps 5–11 reconciled with shipping reality (signing, notarization, DMG, Sparkle, redirect-stripping, MCP rate limits, SECURITY.md all landed across v0.1.0–v0.4.0). Sparkle integration note expanded to call out the v0.3.1 rpath hotfix that fixed the dyld-resolution failure in v0.2.0 + v0.3.0 cold-machine launches. |
 | 1.6 | 2026-04-25 | Phase 8 marked 🟢 COMPLETE — rate limits + StrategyConfig wiring reconciled with shipping reality across v0.3.x–v0.4.0 (Phase 8 steps 5–7 had been left stale while Phase 10 already showed them done). Phase 6 step 12 added: v0.5.0 "Configured AI tools" panel surfacing per-tool MCP wire-up status. Test count synced 60 → 80 in the "What's Built" section, Phase 9 step 1, and Phase 9 checkpoint. Top-of-doc status line updated to reflect the four-surface product shipping today. |
+| 1.7 | 2026-04-26 | Reconciled v0.4.0 + v0.3.0 + remaining v0.5.0 changes that drifted from "What's Built" and Phase 6. Bumped provider count 5 → 6 (added `OpenAICompatibleProvider` for LM Studio / Jan / llama.cpp-server / Msty / LocalAI; v0.4.0). Added `providerModels` per-provider model override (v0.3.0). Phase 6 header flipped from "🟢 SCAFFOLD + DESIGN-SYSTEM MIGRATION COMPLETE" → "🟢 COMPLETE." Phase 6 step 7 rewritten — the Install pane was replaced by silent auto-install on first launch (v0.3.0); UsageView is the new first screen. Phase 6 step 13 added: sidebar update-status footer (v0.5.0). Phase 2 step 5 added: `OpenAICompatibleProvider`. Six-release log added to "What's Built" (v0.1.0 → v0.5.0). Pre-flight moderator-key validation flagged as the remaining UX gap under Phase 9. |

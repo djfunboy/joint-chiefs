@@ -1,7 +1,7 @@
 # Joint Chiefs — Data Model
 
-**Version:** 1.1
-**Last Updated:** 2026-04-19
+**Version:** 1.2
+**Last Updated:** 2026-04-26
 
 ## Live Configuration Types
 
@@ -17,14 +17,17 @@ only by the setup app.
 
 ```swift
 public struct StrategyConfig: Codable, Sendable, Equatable {
-    public var moderator: ModeratorSelection          // .claude, .openai, .gemini, .grok, .none
-    public var tiebreaker: TiebreakerSelection        // .sameAsModerator | .specific(ModeratorSelection)
-    public var consensus: ConsensusMode               // .moderatorDecides, .strictMajority, .bestOfAll, .votingThreshold
-    public var maxRounds: Int                         // default 5 (adaptive early-break inside)
-    public var timeoutSeconds: Int                    // default 120
-    public var thresholdPercent: Double               // 0.0–1.0; only used by .votingThreshold
-    public var providerWeights: [ProviderType: Double] // 0 = excluded, 1.0 = default, >1 = heavier vote
-    public var rateLimits: RateLimits                 // MCP-only: maxConcurrentReviews, reviewsPerHour, dailySpendCapUSD?
+    public var moderator: ModeratorSelection            // .claude, .openai, .gemini, .grok, .none
+    public var tiebreaker: TiebreakerSelection          // .sameAsModerator | .specific(ModeratorSelection)
+    public var consensus: ConsensusMode                 // .moderatorDecides, .strictMajority, .bestOfAll, .votingThreshold
+    public var maxRounds: Int                           // default 5 (adaptive early-break inside)
+    public var timeoutSeconds: Int                      // default 120
+    public var thresholdPercent: Double                 // 0.0–1.0; only used by .votingThreshold
+    public var providerWeights: [ProviderType: Double]  // 0 = excluded, 1.0 = default, >1 = heavier vote
+    public var providerModels: [ProviderType: String]   // per-provider model override; resolution priority providerModels > env var > defaultModel
+    public var ollama: OllamaConfig                     // local Ollama server config (enabled, baseURL, model)
+    public var openAICompatible: OpenAICompatibleConfig // local OpenAI-compatible server (LM Studio / Jan / llama.cpp-server / Msty / LocalAI)
+    public var rateLimits: RateLimits                   // MCP-only: maxConcurrentReviews, reviewsPerHour, dailySpendCapUSD?
 }
 ```
 
@@ -56,16 +59,72 @@ On-disk JSON form is a readable object, not the Swift default flat-array:
 Older `strategy.json` files that predate the field decode to `[:]` via
 `decodeIfPresent`, so upgrades are silent.
 
+### providerModels
+
+Per-provider model override. Resolution priority in `ProviderFactory`:
+`providerModels[type]` > env var (`OPENAI_MODEL`, `ANTHROPIC_MODEL`,
+`GEMINI_MODEL`, `GROK_MODEL`, `OLLAMA_MODEL`, `OPENAI_COMPATIBLE_MODEL`) >
+`ProviderType.defaultModel`. Empty-string entries are treated as missing so
+users can't accidentally lock a provider into a blank model.
+
+The setup app's KeysView surfaces a curated top-5 picker per provider via
+`ProviderType.availableModels` — first entry always matches `defaultModel`.
+Users who need a model outside the curated list can still override via env
+var.
+
+```json
+{
+  "providerModels": {
+    "openAI": "gpt-5.4-mini",
+    "anthropic": "claude-sonnet-4-6"
+  }
+}
+```
+
+### ollama
+
+Configuration for the optional local Ollama general. When `enabled` is false,
+Ollama is skipped even if the server is reachable. The `OLLAMA_ENABLED` env
+var remains a CI override: set to `1` to force-include or `0` to force-exclude,
+regardless of this setting.
+
+```swift
+public struct OllamaConfig: Codable, Sendable, Equatable {
+    public var enabled: Bool        // default false
+    public var baseURL: String      // default http://localhost:11434
+    public var model: String        // default "llama3"
+}
+```
+
+### openAICompatible
+
+Configuration for an optional local inference server that speaks the OpenAI
+chat-completions protocol. Covers LM Studio, Jan, llama.cpp-server, Msty,
+LocalAI, and anything else compatible with `/v1/chat/completions`. Sits
+alongside (not instead of) `ollama` — some users run both, and Ollama's
+native protocol carries richer model-state signals worth preserving. The
+`OPENAI_COMPATIBLE_BASE_URL` env var is the CI override for headless runs.
+
+```swift
+public struct OpenAICompatibleConfig: Codable, Sendable, Equatable {
+    public var enabled: Bool        // default false
+    public var baseURL: String      // default http://localhost:1234/v1 (LM Studio default)
+    public var model: String        // whatever the local server exposes; "" until set
+    public var presetName: String   // display-only hint for the setup app UI ("LM Studio", "Jan", etc.)
+}
+```
+
 ### ProviderType
 
 ```swift
 public enum ProviderType: String, Codable, CaseIterable, Sendable {
-    case openAI, anthropic, gemini, grok, ollama
+    case openAI, anthropic, gemini, grok, ollama, openAICompatible
 
-    public var envVarName: String       // CI-only fallback
-    public var keychainAccount: String? // nil for Ollama (no credential)
+    public var envVarName: String              // CI-only fallback
+    public var keychainAccount: String?        // nil for Ollama and openAICompatible (no credential)
     public var defaultModel: String
     public var defaultEndpoint: String
+    public var availableModels: [String]       // curated top-5 for the KeysView picker (empty for local providers)
 }
 ```
 
@@ -353,3 +412,4 @@ Keychain items use:
 |---|---|---|
 | 1.0 | 2026-04-08 | Initial data model |
 | 1.1 | 2026-04-19 | Added "Live Configuration Types" section describing `StrategyConfig` (including `providerWeights`) and `ProviderType` as they actually exist in the shipping codebase. Marked the SwiftData section as deferred-menu-bar-app reference material. |
+| 1.2 | 2026-04-26 | Reconciled `StrategyConfig` with shipping fields the v1.1 doc was missing: `providerModels` (per-provider model override; v0.3.0), `ollama: OllamaConfig` (first-class config; v0.3.0+), `openAICompatible: OpenAICompatibleConfig` (LM Studio / Jan / llama.cpp-server / Msty / LocalAI; v0.4.0). Added the `.openAICompatible` case to the live `ProviderType` enum and documented `availableModels` (curated top-5 picker source). Added new sections describing `providerModels`, `ollama`, and `openAICompatible` semantics + on-disk JSON shape. |
