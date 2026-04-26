@@ -78,6 +78,22 @@ This is a parallel surface to the in-repo README/docs scan from the prior 2026-0
   5. **Every release's `<item>` in `appcast.xml`** must carry `sparkle:version` matching the new `CFBundleVersion` exactly. Do **not** put the short version string in `sparkle:version`.
   6. **Pre-release verification:** before tagging, confirm the candidate `CFBundleVersion` is strictly greater than the most recent `<item>`'s `sparkle:version` in the live `appcast.xml`. If you don't have web access, the previous release's `BUILD_NUMBER` lives in the prior tag's `Info.plist`.
 
+### 2026-04-26: Shipped v0.5.2 with the website still advertising v0.5.0
+**What happened:** Earlier this same session I added the website-Quickstart-verification rule (item #8: "JSON-LD `softwareVersion` in `index.html` and the `<announce-bar>` text on `guide/*.html` — bumped to the new release"). Hours later, during the v0.5.2 release sequence, I ran a 5-part pre-release review focused on the **app repo** doc scan and shipped the GitHub release + appcast — but never ran the website-side verification. Result: jointchiefs.ai/download's "Download for macOS" button still pointed at the v0.5.0 DMG, the version caption read "v0.5.0 · 5.7 MB", JSON-LD `softwareVersion` was still `"0.5.0"`, and the announce bars on three guide pages still said "v0.5.0". Chris caught it when he was about to download for testing. I had the rule and walked past it.
+**Rule:** **The website-Quickstart-verification list is a hard pre-tag checklist, not a doc.** Order of operations for any future release that touches binaries, paths, version metadata, or install commands:
+  1. Build, sign, notarize, staple the DMG.
+  2. Cold-machine smoke test.
+  3. Open the website repo and **edit** the version-tagged files in this list, all in one branch:
+       - `download.html` — version caption (`vX.Y.Z`), DMG size in MB if changed, download URL, release-notes URL.
+       - `index.html` — JSON-LD `softwareVersion`.
+       - `guide/cli.html`, `guide/mcp.html`, `guide/security.html` — announce-bar version.
+       - `appcast.xml` — new `<item>` (held until step 7 below to avoid pointing at a missing DMG).
+  4. App-repo cask + doc bumps in their own branch (the work I already did in PR #4).
+  5. Run the 5-part pre-release review covering **both repos** — folder scan, diff scan, code review, smoke test, doc scan. The doc scan must include the website files in step 3.
+  6. Merge the app-repo PR. Tag. `gh release create` with the DMG.
+  7. **Only then** push the website branch (cask + appcast + page edits live as one push so Netlify deploys all of it together).
+The trap is that the appcast push needs to wait until after the GH release exists, but the page edits (download URL, JSON-LD, announce bars) can ship alongside. Treat the website push as one atomic event — don't split appcast from the rest, because that's how the page-edit half got skipped today.
+
 ## Common Traps
 
 _To be populated during development._
