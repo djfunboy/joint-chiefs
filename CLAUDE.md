@@ -11,9 +11,9 @@ Multi-model AI code review orchestrator. Four surfaces — CLI, stdio MCP server
 - **Phases 1–3, 5, 8, and 10 complete.** Phase 6 (setup app) ships its full five-view installer with the v0.5.0 "Configured AI tools" panel showing per-tool MCP wire-up status; remaining items are accessibility (VoiceOver / Dynamic Type) and a real-Keychain end-to-end round-trip test, both tracked under Phase 9. Website live at jointchiefs.ai with notarized DMGs + Sparkle appcast through v0.4.0; v0.5.0 cuts on this commit's release.
 - **CLI installed** at `/opt/homebrew/bin/jointchiefs` (Apple Silicon only). Calls the orchestrator directly — no local HTTP server.
 - **MCP server** at `jointchiefs-mcp` — stdio-only, wraps the orchestrator via `modelcontextprotocol/swift-sdk` pinned exact 0.12.0. Spawned by any MCP-aware client via JSON-RPC over stdio.
-- **Setup app** at `jointchiefs-setup` — one-shot SwiftUI installer (Disclosure / Keys / Roles-&-Weights / Install / MCP-Config). All five views use Agentdeck tokens end-to-end. Keychain access goes through the keygetter only.
+- **Setup app** at `jointchiefs-setup` — one-shot SwiftUI installer (Usage / Keys / Roles & Weights / MCP Config / Privacy). All five views use Agentdeck tokens end-to-end. CLI binaries install silently on first launch — no manual destination picker. Keychain access goes through the keygetter only.
 - **Keygetter** at `jointchiefs-keygetter` — the single signed identity authorized to read/write Joint Chiefs' Keychain items. CLI, MCP server, and setup app all invoke it via `Process`.
-- **5 providers working:** OpenAI, Gemini, Grok, Anthropic Claude, plus optional Ollama for local models.
+- **6 providers working:** OpenAI, Anthropic Claude, Gemini, Grok, plus two local options — Ollama (native protocol) and any OpenAI-compatible server (LM Studio, Jan, llama.cpp-server, Msty, LocalAI). Local options are independent — both can run side by side.
 - **Streaming SSE** on every provider — tokens appear live as each model speaks.
 - **Hub-and-spoke debate:** spokes produce findings; the moderator (Claude by default) synthesizes rounds and writes the final anonymous consensus. 4 consensus modes: `moderatorDecides`, `strictMajority`, `bestOfAll`, `votingThreshold` (with per-provider weighting).
 - **80 tests passing.** No performance profiling done yet.
@@ -44,7 +44,7 @@ Multi-model AI code review orchestrator. Four surfaces — CLI, stdio MCP server
 - **MCP server:** Swift executable (`jointchiefs-mcp`), stdio transport, `modelcontextprotocol/swift-sdk` 0.12.0
 - **Setup app:** Swift executable (`jointchiefs-setup`), SwiftUI + `@Observable`, Agentdeck design system
 - **Keygetter:** Swift executable (`jointchiefs-keygetter`), sole Keychain identity
-- **Providers:** OpenAI, Google Gemini, xAI Grok, Anthropic Claude, Ollama — all via REST with SSE streaming
+- **Providers:** OpenAI, Anthropic Claude, Google Gemini, xAI Grok, Ollama, OpenAI-compatible (LM Studio / Jan / llama.cpp-server / Msty / LocalAI) — all via REST with SSE streaming
 - **Orchestrator:** Hub-and-spoke — Claude moderates by default; spokes can be any of the other providers
 - **Storage:** `StrategyConfig` JSON at `~/Library/Application Support/Joint Chiefs/strategy.json` (file mode 0600); local transcript files for reviews; API keys in Keychain via keygetter
 
@@ -57,7 +57,7 @@ API keys are resolved via `APIKeyResolver`:
 
 Optional model overrides (env vars): `OPENAI_MODEL`, `GEMINI_MODEL`, `GROK_MODEL`, `ANTHROPIC_MODEL`, `CONSENSUS_MODEL`.
 
-`OLLAMA_ENABLED=1` and `OLLAMA_MODEL` (default `llama3`) to include a local Ollama model.
+`OLLAMA_ENABLED=1` and `OLLAMA_MODEL` (default `llama3`) to include a local Ollama model. `OPENAI_COMPATIBLE_BASE_URL` and `OPENAI_COMPATIBLE_MODEL` (CI override; the setup app's Roles & Weights screen is the normal config path) to include any OpenAI-compatible server alongside or instead of Ollama.
 
 Strategy (moderator / tiebreaker / consensus mode / rounds / timeout / per-provider weights) is persisted as `StrategyConfig` — see `docs/DATA-MODEL.md`.
 

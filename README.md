@@ -124,22 +124,25 @@ Minimal snippet shape:
                   │  DebateOrchestrator  │
                   └──────────┬───────────┘
                              │
-        ┌────────────────────┼────────────────────┐
-        ▼                    ▼                    ▼
-   ┌────────┐          ┌──────────┐         ┌────────┐
-   │ OpenAI │          │  Gemini  │         │  Grok  │   parallel review
-   └────┬───┘          └────┬─────┘         └────┬───┘
-        └────────────┬──────┴────────────────────┘
-                     │  anonymized findings
-                     ▼
-            ┌──────────────────┐
-            │ Claude moderates │   synthesizes round, writes brief
-            └────────┬─────────┘
-                     │
-                     ▼
-       Next round, or — if positions converged —
-       Claude writes the final consensus summary.
+       ┌──────────┬──────────┼──────────┬──────────┐
+       ▼          ▼          ▼          ▼          ▼
+   ┌────────┐┌──────────┐┌────────┐┌────────┐┌─────────┐
+   │ OpenAI ││Anthropic ││ Gemini ││  Grok  ││  local  │   parallel review
+   └────┬───┘└────┬─────┘└───┬────┘└───┬────┘└────┬────┘   (Ollama / LM Studio
+        └────────┴──────────┼──────────┴──────────┘         / any OpenAI-compat)
+                            │  anonymized findings
+                            ▼
+                  ┌────────────────────┐
+                  │      Moderator     │   synthesizes round, writes brief
+                  │  (default: Claude) │
+                  └─────────┬──────────┘
+                            │
+                            ▼
+             Next round, or — if positions converged —
+             the moderator writes the final consensus.
 ```
+
+You pick which providers participate. The moderator is configurable too (default: Claude); the same provider can serve as both a spoke and the moderator if you want, or you can split the roles.
 
 Up to 5 debate rounds with adaptive early break when positions converge. Findings are anonymized before the final synthesis to reduce bias toward any single provider. Four consensus modes (`moderatorDecides`, `strictMajority`, `bestOfAll`, `votingThreshold`) with per-provider weighting.
 
@@ -157,8 +160,10 @@ Full details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 | `GROK_MODEL` | Grok model override | `grok-3` |
 | `ANTHROPIC_API_KEY` | Anthropic — also serves as moderator | (required to enable Claude) |
 | `ANTHROPIC_MODEL` | Claude model override | `claude-opus-4-6` |
-| `OLLAMA_ENABLED` | Set to `1` to include local Ollama models | off |
+| `OLLAMA_ENABLED` | Set to `1` to force-include / `0` to force-exclude the local Ollama general (overrides `StrategyConfig.ollama.enabled`) | unset (use `StrategyConfig`) |
 | `OLLAMA_MODEL` | Ollama model override | `llama3` |
+| `OPENAI_COMPATIBLE_BASE_URL` | Force-enable an OpenAI-compatible local server (LM Studio, Jan, llama.cpp-server, Msty, LocalAI). CI override for `StrategyConfig.openAICompatible`. | unset |
+| `OPENAI_COMPATIBLE_MODEL` | Model identifier as the local server exposes it | unset |
 | `CONSENSUS_MODEL` | Override the Claude model used for the final synthesis | falls back to `ANTHROPIC_MODEL` |
 
 CLI flags:
@@ -204,7 +209,7 @@ JointChiefs/
 
 ## Contributing
 
-PRs welcome — especially for new providers (Mistral and DeepSeek are on the roadmap). This is a solo-maintained project, so response times will vary. No SLA, no promises about backwards compatibility, and breaking changes can land on `main` between releases.
+PRs welcome — especially first-class providers for Mistral and DeepSeek. Both are reachable today via the OpenAI-compatible path (point `OPENAI_COMPATIBLE_BASE_URL` at `https://api.mistral.ai/v1` or `https://api.deepseek.com/v1`); native providers would add curated model lists and provider-specific handling. This is a solo-maintained project, so response times will vary. No SLA, no promises about backwards compatibility, and breaking changes can land on `main` between releases.
 
 If you want to add a provider, conform to the `ReviewProvider` protocol in [`Sources/JointChiefsCore/Services/Providers/ReviewProvider.swift`](JointChiefs/Sources/JointChiefsCore/Services/Providers/ReviewProvider.swift) and use SSE streaming end-to-end — non-streaming LLM calls are not accepted.
 

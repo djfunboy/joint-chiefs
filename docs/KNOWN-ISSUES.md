@@ -1,19 +1,19 @@
 # Joint Chiefs — Known Issues
 
-**Last Updated:** 2026-04-25
+**Last Updated:** 2026-04-26
 
 A running list of known bugs, limitations, and rough edges. PRs that fix any of these are welcome.
 
 ## Design System Follow-ups (Setup App)
 
-All six setup-app surfaces (`RootView`, `DisclosureView`, `KeysView`, `RolesWeightsView`, `InstallView`, `MCPConfigView`) are migrated to the Agentdeck tokens in `JointChiefsSetup/DesignSystem/`. Follow-up polish:
+All six setup-app view files (`RootView`, `UsageView`, `KeysView`, `RolesWeightsView`, `MCPConfigView`, `DisclosureView` — the last renders as "Privacy") are migrated to the Agentdeck tokens in `JointChiefsSetup/DesignSystem/`. Follow-up polish:
 
-- **Ollama toggle** uses the system default `Toggle` chrome. Agentdeck doesn't yet spec a custom toggle style; revisit if the native look feels out of place against the warm surfaces.
+- **Ollama / OpenAI-compatible enable toggles** use the system default `Toggle` chrome. Agentdeck doesn't yet spec a custom toggle style; revisit if the native look feels out of place against the warm surfaces.
 - **Picker (Tiebreaker)** uses the native `.menu` picker; consensus/moderator moved to `AgentChip`. The menu picker still shows the macOS accent tint — acceptable for a dropdown, but worth revisiting if it reads as inconsistent.
 
 ## Active Bugs
 
-_None currently tracked._
+- **No pre-flight validation when picking a moderator without a saved API key.** `RolesWeightsView` lets the user select any provider as moderator regardless of whether that provider's key is saved. Save accepts it and the review blows up at runtime. Fix: inline error in `RolesWeightsView.moderatorSection` when `model.keyStatuses[selection]` is `.unconfigured`/`.none`/`.failed`, or disable Save until resolved. Originally flagged in the 04-23 UX review; verified still open against `RolesWeightsView.swift` on 2026-04-26.
 
 ## Known Limitations
 
@@ -35,7 +35,7 @@ These were raised by Joint Chiefs reviewing its own source and remain open:
 
 Manual verification gaps (automated tests cover the unit and orchestrator layers, but these need real-world runs):
 
-- [ ] Adaptive early-break behavior with all 5 providers under load.
+- [ ] Adaptive early-break behavior with all 6 providers under load.
 - [ ] Hub-and-spoke moderator synthesis quality on large diffs (>1000 lines).
 - [ ] Keychain storage with `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` across reboots.
 - [ ] CLI behavior when no API keys are configured (should print a clear error).
