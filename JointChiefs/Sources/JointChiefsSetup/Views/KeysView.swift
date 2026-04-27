@@ -255,16 +255,49 @@ private struct OpenAICompatibleCard: View {
                 }
 
                 labeledField("Model") {
-                    TextField(
-                        "",
-                        text: Binding(
-                            get: { model.strategy.openAICompatible.model },
-                            set: { model.setOpenAICompatibleModel($0) }
-                        ),
-                        prompt: Text("exactly as it appears in /v1/models").foregroundStyle(Color.agentTextMuted)
-                    )
-                    .focused($focusedField, equals: .modelName)
-                    .agentInputStyle(focused: focusedField == .modelName)
+                    if model.availableOpenAICompatibleModels.isEmpty {
+                        // No fetch yet (or last fetch failed). Fall back to a
+                        // plain text field so the user is never blocked, but
+                        // signal that Test will populate a dropdown.
+                        TextField(
+                            "",
+                            text: Binding(
+                                get: { model.strategy.openAICompatible.model },
+                                set: { model.setOpenAICompatibleModel($0) }
+                            ),
+                            prompt: Text("Click Test to load available models").foregroundStyle(Color.agentTextMuted)
+                        )
+                        .focused($focusedField, equals: .modelName)
+                        .agentInputStyle(focused: focusedField == .modelName)
+                    } else {
+                        // Server reachable, /v1/models returned a list. Pick
+                        // from what's actually loaded — the only state where
+                        // the configured model is guaranteed to fire a review.
+                        Menu {
+                            ForEach(model.availableOpenAICompatibleModels, id: \.self) { modelId in
+                                Button(modelId) {
+                                    model.setOpenAICompatibleModel(modelId)
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                let current = model.strategy.openAICompatible.model
+                                Text(current.isEmpty ? "Choose a model" : current)
+                                    .foregroundStyle(current.isEmpty ? Color.agentTextMuted : Color.agentTextPrimary)
+                                    .font(.agentBody)
+                                Spacer()
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(Color.agentTextMuted)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                        }
+                        .menuStyle(.borderlessButton)
+                        .agentInputStyle(focused: focusedField == .modelName)
+                    }
                 }
 
                 labeledField("API key") {
@@ -282,13 +315,13 @@ private struct OpenAICompatibleCard: View {
 
                 HStack {
                     Spacer()
-                    Button("Test") {
+                    Button(model.availableOpenAICompatibleModels.isEmpty ? "Test & load models" : "Refresh") {
                         Task { await model.testOpenAICompatibleConnection() }
                     }
                     .buttonStyle(.agentSecondary(size: .small))
                 }
 
-                Text("Tip: make sure your server is running and that the Model name matches what it reports in `GET /v1/models` — the Test button hits that endpoint to verify.")
+                Text("Tip: make sure your server is running, then click \(model.availableOpenAICompatibleModels.isEmpty ? "**Test & load models**" : "**Refresh**") to fetch the list of loaded models from `GET /v1/models`. Pick one from the Model dropdown — that's the model JC will send into the debate.")
                     .font(.agentXS)
                     .foregroundStyle(Color.agentTextMuted)
                     .fixedSize(horizontal: false, vertical: true)
