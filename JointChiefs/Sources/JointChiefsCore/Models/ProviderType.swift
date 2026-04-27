@@ -53,11 +53,11 @@ public enum ProviderType: String, Codable, CaseIterable, Sendable {
             ]
         case .gemini:
             return [
-                "gemini-3.1-pro-preview",   // flagship (default)
-                "gemini-2.5-pro",           // prior flagship
-                "gemini-2.5-flash",         // fast
-                "gemini-2.5-flash-lite",    // budget fast
-                "gemini-2.0-flash"          // older gen
+                "gemini-3.1-pro-preview",      // flagship (default)
+                "gemini-3-pro-preview",        // prior 3.x flagship
+                "gemini-2.5-pro",              // prior-gen flagship
+                "gemini-3.1-flash-lite-preview", // fast / cheap
+                "gemini-2.5-flash"             // fast / balanced fallback
             ]
         case .grok:
             return [
