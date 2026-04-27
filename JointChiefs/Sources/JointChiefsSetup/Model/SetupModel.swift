@@ -78,6 +78,14 @@ final class SetupModel {
     }
     var openAICompatibleStatus: OpenAICompatibleStatus = .unknown
 
+    /// Models the local server reports in `GET /v1/models`. Populated by
+    /// `testOpenAICompatibleConnection` and reset when the endpoint or
+    /// preset changes (the new server might have a completely different
+    /// model set). Drives the Model dropdown in `KeysView` — empty list
+    /// falls the UI back to a plain text field so the user is never stuck
+    /// when the server isn't reachable yet.
+    var availableOpenAICompatibleModels: [String] = []
+
     /// Transient staging field — the user types into this, then the "Save" action
     /// writes to the Keychain via the keygetter and clears the field.
     var keyDrafts: [ProviderType: String] = [:]
@@ -239,6 +247,13 @@ final class SetupModel {
     }
 
     func setOpenAICompatibleEndpoint(_ endpoint: String) {
+        // Endpoint changing means the cached model list is stale — different
+        // server, possibly different roster. Drop it so the UI doesn't show
+        // models from the old server in the dropdown.
+        if endpoint != strategy.openAICompatible.endpoint {
+            availableOpenAICompatibleModels = []
+            openAICompatibleStatus = .unknown
+        }
         strategy.openAICompatible.endpoint = endpoint
         try? StrategyConfigStore.save(strategy)
         strategyIsDirty = false
@@ -257,6 +272,7 @@ final class SetupModel {
     }
 
     func setOpenAICompatiblePreset(_ preset: String) {
+        let presetChanged = strategy.openAICompatible.presetName != preset
         strategy.openAICompatible.presetName = preset
         // Pre-fill the endpoint when the user picks a known preset, but only
         // if the field is empty or still holds another preset's default —
@@ -269,7 +285,20 @@ final class SetupModel {
         let currentEndpoint = strategy.openAICompatible.endpoint
         let isDefaultEndpoint = presetDefaults.values.contains(currentEndpoint) || currentEndpoint.isEmpty
         if isDefaultEndpoint, let newDefault = presetDefaults[preset] {
+            // Endpoint about to change with the preset — invalidate the
+            // cached model list so the dropdown re-fetches against the new
+            // server.
+            if newDefault != strategy.openAICompatible.endpoint {
+                availableOpenAICompatibleModels = []
+                openAICompatibleStatus = .unknown
+            }
             strategy.openAICompatible.endpoint = newDefault
+        } else if presetChanged {
+            // Preset switched but endpoint didn't (user customized it) —
+            // still safer to invalidate, the user is signaling a target
+            // change.
+            availableOpenAICompatibleModels = []
+            openAICompatibleStatus = .unknown
         }
         try? StrategyConfigStore.save(strategy)
         strategyIsDirty = false
@@ -310,6 +339,9 @@ final class SetupModel {
             }
             let parsed = try? JSONDecoder().decode(ModelListResponse.self, from: data)
             let availableIds = (parsed?.data.map { $0.id }) ?? []
+            // Cache the list so the Model dropdown in KeysView can populate
+            // from it. Sorted for stable UI ordering across refreshes.
+            availableOpenAICompatibleModels = availableIds.sorted()
             let configuredModel = strategy.openAICompatible.model
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             let presetName = strategy.openAICompatible.presetName
