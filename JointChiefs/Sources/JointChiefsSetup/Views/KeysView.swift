@@ -315,13 +315,13 @@ private struct OpenAICompatibleCard: View {
 
                 HStack {
                     Spacer()
-                    Button(model.availableOpenAICompatibleModels.isEmpty ? "Load models" : "Refresh") {
+                    Button(model.availableOpenAICompatibleModels.isEmpty ? "Test & Load Models" : "Refresh") {
                         Task { await model.testOpenAICompatibleConnection() }
                     }
                     .buttonStyle(.agentSecondary(size: .small))
                 }
 
-                Text("Tip: make sure your server is running, then click \(model.availableOpenAICompatibleModels.isEmpty ? "**Load models**" : "**Refresh**") to fetch the list of loaded models from `GET /v1/models`. Pick one from the Model dropdown — that's the model JC will send into the debate.")
+                Text("Tip: make sure your server is running, then click \(model.availableOpenAICompatibleModels.isEmpty ? "**Test & Load Models**" : "**Refresh**") to fetch the list of loaded models from `GET /v1/models`. Pick one from the Model dropdown — that's the model JC will send into the debate.")
                     .font(.agentXS)
                     .foregroundStyle(Color.agentTextMuted)
                     .fixedSize(horizontal: false, vertical: true)
