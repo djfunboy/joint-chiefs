@@ -338,9 +338,25 @@ final class SetupModel {
                 let data: [Entry]
             }
             let parsed = try? JSONDecoder().decode(ModelListResponse.self, from: data)
-            let availableIds = (parsed?.data.map { $0.id }) ?? []
-            // Cache the list so the Model dropdown in KeysView can populate
-            // from it. Sorted for stable UI ordering across refreshes.
+            let allIds = (parsed?.data.map { $0.id }) ?? []
+            // /v1/models returns everything the server has loaded —
+            // including specialized models that can't participate in a
+            // chat-completions debate (embedding, speech, image,
+            // reranker). Joint Chiefs only sends `/v1/chat/completions`
+            // requests, so non-chat models would just error out at first
+            // review. Filter them by ID substring — imperfect but covers
+            // the cases LM Studio / Jan / Msty / LocalAI commonly ship.
+            // Users can still type a filtered ID into the field manually
+            // if they really want to (the dropdown only appears when
+            // there's something to show).
+            let nonChatPatterns = ["embed", "whisper", "tts", "rerank", "speech", "voice"]
+            let availableIds = allIds.filter { id in
+                let lower = id.lowercased()
+                return !nonChatPatterns.contains { lower.contains($0) }
+            }
+            // Cache the filtered list so the Model dropdown in KeysView
+            // populates from it. Sorted for stable UI ordering across
+            // refreshes.
             availableOpenAICompatibleModels = availableIds.sorted()
             let configuredModel = strategy.openAICompatible.model
                 .trimmingCharacters(in: .whitespacesAndNewlines)
