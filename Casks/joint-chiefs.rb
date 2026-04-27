@@ -11,8 +11,8 @@
 #      `brew tap djfunboy/jointchiefs && brew install --cask joint-chiefs`.
 
 cask "joint-chiefs" do
-  version "0.5.3"
-  sha256 "f93c017af7acdf05625ab38826f00da3ee53e938d3eaf61f8b288df41f0e97b3"
+  version "0.5.4"
+  sha256 "89ea437526c1b59864d63086905a214025c0237d47753a3db15bfced7757d7bc"
 
   url "https://github.com/djfunboy/joint-chiefs/releases/download/v#{version}/Joint-Chiefs.dmg",
       verified: "github.com/djfunboy/joint-chiefs/"
