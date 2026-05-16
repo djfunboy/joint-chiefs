@@ -221,29 +221,32 @@ final class ProviderConfig {
 ### ProviderType
 
 ```swift
-enum ProviderType: String, Codable, CaseIterable {
-    case openAI
-    case gemini
-    case grok
-    case ollama
+public enum ProviderType: String, Codable, CaseIterable, Sendable {
+    case openAI, anthropic, gemini, grok, ollama, openAICompatible
 
-    var defaultEndpoint: String {
+    public var defaultEndpoint: String {
         switch self {
         case .openAI: "https://api.openai.com/v1"
+        case .anthropic: "https://api.anthropic.com"
         case .gemini: "https://generativelanguage.googleapis.com/v1beta"
         case .grok: "https://api.x.ai/v1"
         case .ollama: "http://localhost:11434"
+        case .openAICompatible: "http://localhost:1234/v1"
         }
     }
 
-    var defaultModel: String {
+    public var defaultModel: String {
         switch self {
-        case .openAI: "gpt-5"
-        case .gemini: "gemini-3-pro"
-        case .grok: "grok-3"
+        case .openAI: "gpt-5.5"
+        case .anthropic: "claude-opus-4-7"
+        case .gemini: "gemini-3.1-pro-preview"
+        case .grok: "grok-4.3"           // ← now active
         case .ollama: "llama3"
+        case .openAICompatible: ""
         }
     }
+
+    // availableModels list curated per provider (see source for full details)
 }
 ```
 

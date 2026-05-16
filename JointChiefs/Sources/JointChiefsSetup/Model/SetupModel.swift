@@ -406,6 +406,19 @@ final class SetupModel {
             keyDrafts[provider] = ""
         } catch {
             keyStatuses[provider] = .failed(error.localizedDescription)
+            return
+        }
+        // Warm-up read from a *separate* keygetter process. macOS scopes a
+        // Keychain item's ACL to the process context that created it; the first
+        // read from any other process triggers an "allow access" prompt. Firing
+        // that read here — while the setup app is foreground and the user is
+        // present — surfaces the prompt now (answer it with "Always Allow")
+        // instead of ambushing a headless CLI/MCP read later, where nobody can
+        // approve it and the key silently reads back as "not configured".
+        // Detached so the modal prompt doesn't block the window; the returned
+        // key is intentionally discarded — the call exists only to prompt.
+        Task.detached {
+            _ = try? APIKeyResolver.readFromKeygetter(account: account)
         }
     }
 

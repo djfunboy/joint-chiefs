@@ -1,14 +1,17 @@
 # Joint Chiefs
 
+
+**Goal:** Public MIT-licensed open-source tool in a portfolio of ~10 apps, operated by a single owner with strong product and business instincts. Success path is adoption and acquisition value, not direct revenue — "users" means downloads, stars, and integration into other workflows; exact counts aren't tracked. Reliability beats features: every fix should reduce friction or breakage, not add surface area. Prefer minimal correct changes. Don't propose monetization, premium tiers, or scale infrastructure unless explicitly asked — the owner will raise those when relevant.
+
 Multi-model AI code review orchestrator. Four surfaces — CLI, stdio MCP server, macOS setup app, and a single Keychain-access binary — all built from one `JointChiefsCore` engine. Sends code to multiple LLMs, runs a structured hub-and-spoke debate with Claude as moderator/decider, and streams a consensus summary back. Grounded in Multi-Agent Debate (MAD) research showing debate improves factuality and reasoning over single-model output.
 
 **Website:** https://jointchiefs.ai/ (live — source in the private `djfunboy/joint-chiefs-website` repo; this repo is the app)
-**Latest release:** v0.5.5 — filter non-chat models out of the OpenAI-compatible Model dropdown. Embedding models (`text-embedding-*`), speech models (`whisper-*`, `tts-*`), and rerankers no longer pollute the picker — they can't participate in chat-completions debates and would error at first review if selected. CFBundleVersion `1777000003`. Builds on v0.5.4's local-server UX overhaul.
+**Latest release:** v0.5.6 — critical OpenAI fix: v0.5.5 sent `temperature: 0.2`, which every `gpt-5.x` model 400-rejects, so OpenAI reviews failed outright; the parameter is now omitted (regression-tested). Also: full provider model-list refresh against live endpoints (Grok default → `grok-4.3`; Gemini and Anthropic pickers refreshed), MCP progress side-channels (`ProgressBroadcaster` — stderr heartbeats + a `current-review.json` status file), and an in-context Keychain fix — the setup app fires a warm-up read after Save so macOS surfaces its access prompt while the user is present, instead of ambushing a later headless CLI/MCP read. CFBundleVersion `1777000004`. Builds on v0.5.5.
 **Next session:** start by reading the most recent `tasks/SESSION-HANDOFF-*.md` (gitignored; local-only).
 
 ## Current State
 
-- **Phases 1–3, 5, 8, and 10 complete.** Phase 6 (setup app) ships its full five-view installer with the v0.5.0 "Configured AI tools" panel showing per-tool MCP wire-up status; remaining items are accessibility (VoiceOver / Dynamic Type) and a real-Keychain end-to-end round-trip test, both tracked under Phase 9. Website live at jointchiefs.ai with notarized DMGs + Sparkle appcast through v0.5.5.
+- **Phases 1–3, 5, 8, and 10 complete.** Phase 6 (setup app) ships its full five-view installer with the v0.5.0 "Configured AI tools" panel showing per-tool MCP wire-up status; remaining items are accessibility (VoiceOver / Dynamic Type) and a real-Keychain end-to-end round-trip test, both tracked under Phase 9. Website live at jointchiefs.ai with notarized DMGs + Sparkle appcast through v0.5.6.
 - **CLI installed** at `/opt/homebrew/bin/jointchiefs` (Apple Silicon only). Calls the orchestrator directly — no local HTTP server.
 - **MCP server** at `jointchiefs-mcp` — stdio-only, wraps the orchestrator via `modelcontextprotocol/swift-sdk` pinned exact 0.12.0. Spawned by any MCP-aware client via JSON-RPC over stdio.
 - **Setup app** at `jointchiefs-setup` — one-shot SwiftUI installer (Usage / Keys / Roles & Weights / MCP Config / Privacy). All five views use Agentdeck tokens end-to-end. CLI binaries install silently on first launch — no manual destination picker. Keychain access goes through the keygetter only.
@@ -16,7 +19,7 @@ Multi-model AI code review orchestrator. Four surfaces — CLI, stdio MCP server
 - **6 providers working:** OpenAI, Anthropic Claude, Gemini, Grok, plus two local options — Ollama (native protocol) and any OpenAI-compatible server (LM Studio, Jan, llama.cpp-server, Msty, LocalAI). Local options are independent — both can run side by side.
 - **Streaming SSE** on every provider — tokens appear live as each model speaks.
 - **Hub-and-spoke debate:** spokes produce findings; the moderator (Claude by default) synthesizes rounds and writes the final anonymous consensus. 4 consensus modes: `moderatorDecides`, `strictMajority`, `bestOfAll`, `votingThreshold` (with per-provider weighting).
-- **80 tests passing.** No performance profiling done yet.
+- **81 tests passing.** No performance profiling done yet.
 
 ## Key Rules
 
@@ -61,7 +64,7 @@ Optional model overrides (env vars): `OPENAI_MODEL`, `GEMINI_MODEL`, `GROK_MODEL
 
 Strategy (moderator / tiebreaker / consensus mode / rounds / timeout / per-provider weights) is persisted as `StrategyConfig` — see `docs/DATA-MODEL.md`.
 
-**Default models:** `gpt-5.5`, `gemini-3.1-pro-preview`, `grok-4.20-0309-reasoning`, `claude-opus-4-7`
+**Default models:** `gpt-5.5`, `gemini-3.1-pro-preview`, `grok-4.3`, `claude-opus-4-7`
 **Default debate settings:** 5 rounds with adaptive early break, 120s per-request timeout
 
 ### Local API Keys (dev only)

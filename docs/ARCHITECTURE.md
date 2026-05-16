@@ -1,7 +1,7 @@
 # Joint Chiefs — Architecture
 
-**Version:** 1.6
-**Last Updated:** 2026-04-26
+**Version:** 1.7
+**Last Updated:** 2026-04-30
 
 **Website:** [jointchiefs.ai](https://jointchiefs.ai/) — deployed via Netlify. Source in the private `djfunboy/joint-chiefs-website` repo.
 **App repo:** [github.com/djfunboy/joint-chiefs](https://github.com/djfunboy/joint-chiefs) (public, MIT).
@@ -371,7 +371,7 @@ for enum-keyed dictionaries. See the custom `init(from:)` / `encode(to:)` in
 | `GEMINI_API_KEY` | Google Gemini authentication | (required to enable Gemini) |
 | `GEMINI_MODEL` | Gemini model override | `gemini-3.1-pro-preview` |
 | `GROK_API_KEY` | xAI Grok authentication | (required to enable Grok) |
-| `GROK_MODEL` | Grok model override | `grok-4.20-0309-reasoning` |
+| `GROK_MODEL` | Grok model override | `grok-4.3` |
 | `ANTHROPIC_API_KEY` | Anthropic authentication — also serves as deciding model | (required to enable Claude) |
 | `ANTHROPIC_MODEL` | Claude model override | `claude-opus-4-7` |
 | `OLLAMA_ENABLED` | Set to `1` to force-include / `0` to force-exclude the local Ollama general (overrides `StrategyConfig.ollama.enabled`) | unset (use `StrategyConfig`) |
@@ -406,10 +406,24 @@ Claude model for per-round reviews and a larger one for the final call.
 
 ## Performance Targets
 
+A full hub-and-spoke debate runs initial parallel reviews + up to 5 debate
+rounds (with adaptive early break) + moderator synthesis across multiple
+LLMs. Realistic latency depends heavily on panel size and whether a local
+model is in the mix; cloud-only panels finish in minutes, panels that
+include a local model (Ollama, LM Studio, llama.cpp-server, Msty, LocalAI)
+extend further because a single local-model round can itself be a multi-
+minute wall-clock cost. None of those long runs are "stuck" — they're
+active inference. Progress is surfaced through three side channels (MCP
+`notifications/progress`, `jointchiefs-mcp` stderr heartbeats, and a JSON
+status file at `~/Library/Caches/Joint Chiefs/current-review.json`) so a
+host UI showing only an elapsed-time counter doesn't make a working run
+look indistinguishable from a hang.
+
 | Metric | Target |
 |---|---|
 | Request to first API call | < 2s |
-| Full review (3 models, 2 rounds) | < 90s |
+| Full review (cloud-only, 3-model panel, adaptive break) | minutes (typical) |
+| Full review (panel includes a local model) | 15+ minutes typical (inference cost of the local model) |
 | App idle memory | < 100MB |
 | Server overhead per request | < 100ms |
 | Transcript storage per review | < 500KB |
@@ -425,8 +439,8 @@ Claude model for per-round reviews and a larger one for the final call.
 
 - **App repo:** public at [github.com/djfunboy/joint-chiefs](https://github.com/djfunboy/joint-chiefs) — MIT licensed.
 - **Website:** [jointchiefs.ai](https://jointchiefs.ai/) — static HTML + shared `styles.css`, Agentdeck palette matching the setup app. Hosted on Netlify; source is a separate private repo (`djfunboy/joint-chiefs-website`) with auto-deploy on push to main. Netlify manages the apex domain + `www` alias + Let's Encrypt cert.
-- **Release artifact:** notarized + stapled DMG containing `Joint Chiefs.app` with the four binaries in `Contents/Resources/` (CLI/MCP/keygetter) and `Contents/MacOS/jointchiefs-setup`. Shipped through v0.5.5; SHA-256 wired into `Casks/joint-chiefs.rb`.
-- **Sparkle appcast** at [jointchiefs.ai/appcast.xml](https://jointchiefs.ai/appcast.xml) — EdDSA-signed entries for v0.5.0, v0.5.2, v0.5.3, v0.5.4, and v0.5.5. Pre-v0.5.0 entries were stripped after the v0.5.0 build-number bug (see `tasks/lessons.md` 2026-04-26 — they used Unix-timestamp `CFBundleVersion` values that exceeded v0.5.0's sequential `5`, causing Sparkle to "downgrade" fresh installs).
+- **Release artifact:** notarized + stapled DMG containing `Joint Chiefs.app` with the four binaries in `Contents/Resources/` (CLI/MCP/keygetter) and `Contents/MacOS/jointchiefs-setup`. Shipped through v0.5.6; SHA-256 wired into `Casks/joint-chiefs.rb`.
+- **Sparkle appcast** at [jointchiefs.ai/appcast.xml](https://jointchiefs.ai/appcast.xml) — EdDSA-signed entries for v0.5.0, v0.5.2, v0.5.3, v0.5.4, v0.5.5, and v0.5.6. Pre-v0.5.0 entries were stripped after the v0.5.0 build-number bug (see `tasks/lessons.md` 2026-04-26 — they used Unix-timestamp `CFBundleVersion` values that exceeded v0.5.0's sequential `5`, causing Sparkle to "downgrade" fresh installs).
 - **Auto-update path:** Sparkle for the app bundle. The `UpdaterService` wrapper drives the sidebar update-status footer. No custom updater for the CLI or MCP binaries — Sparkle replaces the bundle and the bundled binaries get re-installed via `SetupModel.installCLIIfNeeded()` on next launch. A fresh `brew install --cask joint-chiefs` (homebrew tap pending) achieves the same.
 - **Build scripts:** `scripts/build-app.sh` (Release build + bundle assembly + Sparkle.framework copy + `install_name_tool` rpath patch + Developer ID signing), `scripts/build-dmg.sh` (DMG creation + notarization submit + staple), `scripts/generate-icon.sh` (icon `.icns` from PDF source).
 
@@ -441,3 +455,4 @@ Claude model for per-round reviews and a larger one for the final call.
 | 1.4 | 2026-04-20 | Added website + repository references to the header, plus a new Distribution section documenting the Netlify deployment of jointchiefs.ai (site id, domain aliases, Sparkle appcast location). Corrected the auto-update description to match the lean baseline — Sparkle for the app bundle only, no custom updater for CLI/MCP binaries. |
 | 1.5 | 2026-04-25 | Reconciled the Tech Stack and DebateOrchestrator sections with shipping reality — replaced the "Menu bar app, settings, transcript viewer" stack row with the four shipped surfaces (setup app, CLI, MCP server, keygetter); replaced "SwiftData persistence" with `StrategyConfig` JSON + local transcript files (SwiftData remains reserved for the deferred menu bar app). Bumped default debate rounds from 2 → 5 with adaptive early-break. Removed the "setup app is deferred" line above the project tree. Data-flow note flipped from "CLI or HTTP" to "CLI invocation or MCP tool call." |
 | 1.6 | 2026-04-26 | Reconciled v0.4.0 + v0.5.0 changes that drifted from the doc. Added the 6th provider type (`openAICompatible` — LM Studio / Jan / llama.cpp-server / Msty / LocalAI) to the System Overview, ASCII diagram, project tree, streaming-providers list, and configuration env-var table. Rewrote the Setup App section: five sections are now Usage / Keys / Roles & Weights / MCP Config / Privacy (Install pane was replaced by silent auto-install in v0.3.0; "How to Use" is the new first screen; "Privacy" is the renamed Disclosure). Documented the v0.5.0 "Configured AI tools" panel and sidebar update-status footer with `MCPConfigScanner` and `UpdaterService`. Fixed the Development Environment dependencies line — removed Hummingbird and SwiftData (never landed / not used), listed the actual three deps from `Package.swift`. Distribution section reflects shipped state: notarized DMGs through v0.5.0, Sparkle appcast live, build-script trio (`build-app.sh`, `build-dmg.sh`, `generate-icon.sh`). |
+| 1.7 | 2026-04-30 | Replaced the absurd "Full review (3 models, 2 rounds) < 90s" performance target. Realistic latency for a hub-and-spoke debate is minutes for cloud-only panels and 15+ minutes when a local model is in the panel — that's inference cost, not a hang. Added the three side channels for progress visibility (MCP `notifications/progress`, `jointchiefs-mcp` stderr heartbeats, and `~/Library/Caches/Joint Chiefs/current-review.json` status file) so a host UI showing only elapsed time doesn't make a working run look stuck. Source: tasks/lessons.md 2026-04-30 (`<90s` target retired) and the new `ProgressBroadcaster` in `JointChiefsMCPServer.swift`. |

@@ -189,4 +189,22 @@ struct OpenAIProviderTests {
         #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer test-key-123")
         #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
     }
+
+    @Test("OpenAI request omits temperature for reasoning model compatibility")
+    func requestOmitsTemperature() async throws {
+        MockURLProtocol.lastRequestBody = nil
+        let responseData = TestHelpers.makeChatCompletionResponse(content: "ok")
+
+        MockURLProtocol.requestHandler = { request in
+            let response = TestHelpers.makeHTTPResponse(url: request.url!, statusCode: 200)
+            return (response, responseData)
+        }
+
+        let provider = makeProvider()
+        _ = try await provider.testConnection()
+
+        let body = try #require(MockURLProtocol.lastRequestBody)
+        let object = try JSONSerialization.jsonObject(with: body) as? [String: Any]
+        #expect(object?["temperature"] == nil)
+    }
 }

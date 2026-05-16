@@ -1,7 +1,7 @@
 # Joint Chiefs — Product Requirements Document
 
-**Version:** 1.6
-**Last Updated:** 2026-04-26
+**Version:** 1.7
+**Last Updated:** 2026-04-30
 
 **Website:** [jointchiefs.ai](https://jointchiefs.ai/) (live)
 **Repository:** [github.com/djfunboy/joint-chiefs](https://github.com/djfunboy/joint-chiefs) (public, MIT)
@@ -85,7 +85,7 @@ the CLI and MCP server. Five sections, in display order:
 - [x] **Privacy** (last screen) — data-handling disclosure: what's sent to providers, what stays local, what the app refuses to do (no telemetry, no analytics); MIT-licensed link to the public repo
 - [x] Silent CLI install on first launch (v0.3.0) — `SetupModel.installCLIIfNeeded()` copies the three binaries into `/opt/homebrew/bin` (or `~/.local/bin` fallback) at `RootView.task` time; replaced the earlier user-facing Install pane
 - [x] All five views migrated to Agentdeck design tokens (no hex/CGFloat literals in any view); new design-system components: `AgentInputStyle`, `agentPanel`, `AgentPill`, `AgentChip`, `AgentSectionHeader`, `SetupPage`
-- [x] Bundled in `Joint Chiefs.app` with `Contents/Resources/` binaries — DMGs notarized + stapled through v0.5.5
+- [x] Bundled in `Joint Chiefs.app` with `Contents/Resources/` binaries — DMGs notarized + stapled through v0.5.6
 - [x] **"Configured AI tools" panel (v0.5.0)** — `MCPConfigScanner` walks home-dir conventional config locations (top-level dotfiles, `~/.<dir>/<file>`, `~/.config/<dir>/<file>`, `~/Library/Application Support/<dir>/<sub>/<file>`), structurally confirms each MCP-server stanza, and reports per-tool wire-up status with a "wired in M of N" pill. Detection is by stanza shape, never by client name.
 - [x] **Sidebar update-status footer (v0.5.0)** — currently-running version + Sparkle-driven "Check for updates" / "update available" affordance with inline spinner during user-triggered checks.
 - [ ] VoiceOver + Dynamic Type pass (tracked in Phase 9)
@@ -105,10 +105,11 @@ Local transcript files written to disk. A UI for browsing them is deferred with 
 
 ### Performance
 - Initial review dispatch: < 2s from request to first API call
-- Total review cycle (3 models, default 5 rounds with adaptive early-break): < 90s typical
+- Total review-cycle latency varies with panel size and whether a local model is included. Cloud-only 3-model panels with adaptive early break typically complete in minutes; panels including a local model (Ollama, LM Studio, llama.cpp-server, Msty, LocalAI) can run 15+ minutes — that's the inference cost of the local model, not a hang. Anchor stuck-vs-working diagnosis at minutes, not seconds.
+- Round-by-round progress visibility is required, not optional: MCP `notifications/progress` (when the host opts in via `_meta.progressToken`), `jointchiefs-mcp` stderr heartbeat lines on every milestone, and a JSON status file at `~/Library/Caches/Joint Chiefs/current-review.json` overwritten on each milestone.
 - Setup app idle memory: < 100MB
 - MCP tool-call overhead: < 100ms before the orchestrator dispatches (excludes LLM latency)
-- Note: idle memory and full review-cycle latency have not been profiled yet (tracked in Phase 9 step 5)
+- Note: idle memory has not been profiled yet (tracked in Phase 9 step 5).
 
 ### Reliability
 - Graceful handling of provider timeouts and errors — orchestrator continues with remaining providers if one fails mid-round
@@ -175,7 +176,7 @@ Local transcript files written to disk. A UI for browsing them is deferred with 
 
 ## Success Metrics
 
-- Review cycle completes in < 90s for 3 models, 2 rounds
+- Review cycle completes successfully and surfaces round-by-round progress through all three side channels (MCP `notifications/progress`, `jointchiefs-mcp` stderr, status JSON), so users can see active work even on multi-minute runs that include a local model
 - Consensus summary fits in < 2000 characters
 - Works with any AI CLI or MCP-aware client without modification
 - Zero data leaves the machine except to configured LLM APIs
@@ -191,3 +192,4 @@ Local transcript files written to disk. A UI for browsing them is deferred with 
 | 1.4 | 2026-04-25 | Reconciled local-server contradictions. Solution rewritten around the four-surface MCP-first product. F4's MCP-wrapper bullet flipped to ✅ (shipped via Phase 8). Technical Requirements rewritten — removed "local server response" / "server auto-restarts" / "binds to localhost" lines; replaced with stdio-MCP-aware reliability + security text. |
 | 1.5 | 2026-04-25 | F6 promoted from "DONE (scaffold)" to plain DONE — bundle + DMG checkbox flipped from `[ ]` → `[x]` (DMGs notarized + stapled through v0.4.0). Added two v0.5.0 checkboxes: the "Configured AI tools" panel surfacing per-tool MCP wire-up status, and the sidebar update-status footer. |
 | 1.6 | 2026-04-26 | Vision rewritten — dropped the "macOS menu bar app" framing that contradicted F5's DEFERRED status; now describes the four-surface MCP-first product. F1 bullet added for the 6th provider (OpenAI-compatible / LM Studio). F6 section list rewritten in display order — Usage / Keys / Roles & Weights / MCP Config / Privacy (was Disclosure / Keys / Roles / Install / MCP Config) — and silent CLI install on first launch documented (Install pane was replaced in v0.3.0). Added the still-open pre-flight moderator-key validation gap as an unchecked F6 item. Performance line corrected: default is 5 rounds with adaptive early-break, not 2. Flow 1 split into end-user (setup app) path and developer (env-var) path. |
+| 1.7 | 2026-04-30 | Retired the "<90s for 3 models, 2 rounds" performance + success-metric line — absurd target that made multi-minute runs (especially panels with a local model) look stuck. Performance section reframed around realistic minutes-to-tens-of-minutes latency. Added required round-by-round progress visibility through three side channels: MCP `notifications/progress`, `jointchiefs-mcp` stderr heartbeats, and a status JSON file at `~/Library/Caches/Joint Chiefs/current-review.json`. Source: tasks/lessons.md 2026-04-30 + new `ProgressBroadcaster` in `JointChiefsMCPServer.swift`. |

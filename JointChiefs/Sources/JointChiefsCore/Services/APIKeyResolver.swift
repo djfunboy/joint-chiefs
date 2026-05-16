@@ -188,7 +188,7 @@ public enum APIKeyResolverError: Error, LocalizedError, Sendable {
         case .decodeFailed:
             "Keygetter returned invalid UTF-8 output."
         case .interactionNotAllowed:
-            "Keychain requires user interaction but the process is running headlessly."
+            "Keychain access needs a one-time approval that can't be answered in a headless context. Open Joint Chiefs once and click \"Always Allow\" on the prompt, or set the provider's API-key environment variable for headless use."
         case .keygetterFailed(let code, let stderr):
             "Keygetter exited with status \(code): \(stderr)"
         }

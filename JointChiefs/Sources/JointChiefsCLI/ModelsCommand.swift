@@ -96,7 +96,14 @@ struct Models: AsyncParsableCommand {
     // MARK: - Row Printing
 
     private func printSlotRow(_ slot: ProviderSlot, status: TestResult?) {
-        let icon = slot.isConfigured ? Glyph.star : Glyph.empty
+        let icon: String
+        if slot.isConfigured {
+            icon = Glyph.star
+        } else if slot.keychainBlocked {
+            icon = Glyph.warn
+        } else {
+            icon = Glyph.empty
+        }
         let name = slot.displayName.padding(toLength: 9, withPad: " ", startingAt: 0)
         let model = (slot.model ?? "").padding(toLength: 28, withPad: " ", startingAt: 0)
 
@@ -169,6 +176,10 @@ private struct ProviderSlot: Sendable {
     let displayName: String
     let model: String?
     let isConfigured: Bool
+    /// True when a key exists in the Keychain but its ACL needs a one-time
+    /// interactive approval — so the row reports "Keychain needs approval"
+    /// rather than the misleading "not configured".
+    let keychainBlocked: Bool
     let unconfiguredHint: String
     private let providerFactory: @Sendable () -> (any ReviewProvider)?
 
@@ -177,6 +188,7 @@ private struct ProviderSlot: Sendable {
         displayName: String,
         model: String?,
         isConfigured: Bool,
+        keychainBlocked: Bool,
         unconfiguredHint: String,
         providerFactory: @escaping @Sendable () -> (any ReviewProvider)?
     ) {
@@ -184,6 +196,7 @@ private struct ProviderSlot: Sendable {
         self.displayName = displayName
         self.model = model
         self.isConfigured = isConfigured
+        self.keychainBlocked = keychainBlocked
         self.unconfiguredHint = unconfiguredHint
         self.providerFactory = providerFactory
     }
@@ -195,51 +208,55 @@ private struct ProviderSlot: Sendable {
 
         switch kind {
         case .openai:
-            let key = resolve(.openAI)
+            let resolved = resolveKey(.openAI)
             let model = env["OPENAI_MODEL"] ?? ProviderType.openAI.defaultModel
             return ProviderSlot(
                 kind: .openai,
                 displayName: "OpenAI",
                 model: model,
-                isConfigured: key != nil,
-                unconfiguredHint: "not configured — add via setup app or set OPENAI_API_KEY",
-                providerFactory: { key.map { OpenAIProvider(apiKey: $0, model: model) } }
+                isConfigured: resolved.key != nil,
+                keychainBlocked: resolved.blocked,
+                unconfiguredHint: hint(blocked: resolved.blocked, envVar: "OPENAI_API_KEY"),
+                providerFactory: { resolved.key.map { OpenAIProvider(apiKey: $0, model: model) } }
             )
 
         case .gemini:
-            let key = resolve(.gemini)
+            let resolved = resolveKey(.gemini)
             let model = env["GEMINI_MODEL"] ?? ProviderType.gemini.defaultModel
             return ProviderSlot(
                 kind: .gemini,
                 displayName: "Gemini",
                 model: model,
-                isConfigured: key != nil,
-                unconfiguredHint: "not configured — add via setup app or set GEMINI_API_KEY",
-                providerFactory: { key.map { GeminiProvider(apiKey: $0, model: model) } }
+                isConfigured: resolved.key != nil,
+                keychainBlocked: resolved.blocked,
+                unconfiguredHint: hint(blocked: resolved.blocked, envVar: "GEMINI_API_KEY"),
+                providerFactory: { resolved.key.map { GeminiProvider(apiKey: $0, model: model) } }
             )
 
         case .grok:
-            let key = resolve(.grok)
+            let resolved = resolveKey(.grok)
             let model = env["GROK_MODEL"] ?? ProviderType.grok.defaultModel
             return ProviderSlot(
                 kind: .grok,
                 displayName: "Grok",
                 model: model,
-                isConfigured: key != nil,
-                unconfiguredHint: "not configured — add via setup app or set GROK_API_KEY",
-                providerFactory: { key.map { GrokProvider(apiKey: $0, model: model) } }
+                isConfigured: resolved.key != nil,
+                keychainBlocked: resolved.blocked,
+                unconfiguredHint: hint(blocked: resolved.blocked, envVar: "GROK_API_KEY"),
+                providerFactory: { resolved.key.map { GrokProvider(apiKey: $0, model: model) } }
             )
 
         case .anthropic:
-            let key = resolve(.anthropic)
+            let resolved = resolveKey(.anthropic)
             let model = env["ANTHROPIC_MODEL"] ?? ProviderType.anthropic.defaultModel
             return ProviderSlot(
                 kind: .anthropic,
                 displayName: "Claude",
                 model: model,
-                isConfigured: key != nil,
-                unconfiguredHint: "not configured — add via setup app or set ANTHROPIC_API_KEY (also the moderator)",
-                providerFactory: { key.map { AnthropicProvider(apiKey: $0, model: model) } }
+                isConfigured: resolved.key != nil,
+                keychainBlocked: resolved.blocked,
+                unconfiguredHint: hint(blocked: resolved.blocked, envVar: "ANTHROPIC_API_KEY", suffix: " (also the moderator)"),
+                providerFactory: { resolved.key.map { AnthropicProvider(apiKey: $0, model: model) } }
             )
 
         case .ollama:
@@ -250,16 +267,38 @@ private struct ProviderSlot: Sendable {
                 displayName: "Ollama",
                 model: enabled ? model : nil,
                 isConfigured: enabled,
+                keychainBlocked: false,
                 unconfiguredHint: "disabled — set OLLAMA_ENABLED=1 for local models",
                 providerFactory: { enabled ? OllamaProvider(model: model) : nil }
             )
         }
     } }
 
-    /// Resolver errors at listing time are non-fatal; treat as unconfigured and let
-    /// `--test` surface the underlying failure to the user.
-    private static func resolve(_ provider: ProviderType) -> String? {
-        (try? APIKeyResolver.resolve(provider)).flatMap { $0 }
+    /// Resolve a provider's key for the listing.
+    ///
+    /// Returns the key when available, plus a `blocked` flag set when the key
+    /// exists in the Keychain but its ACL needs a one-time interactive approval
+    /// the `models` command can't satisfy. That case must NOT be reported as
+    /// "not configured" — it has a different fix (approve the prompt, or set
+    /// the env var). Any other resolver error stays non-fatal: treated as
+    /// unconfigured here, surfaced by `--test`.
+    private static func resolveKey(_ provider: ProviderType) -> (key: String?, blocked: Bool) {
+        do {
+            return (try APIKeyResolver.resolve(provider), false)
+        } catch APIKeyResolverError.interactionNotAllowed {
+            return (nil, true)
+        } catch {
+            return (nil, false)
+        }
+    }
+
+    /// Trailing hint for a non-configured slot. A `blocked` slot has a saved key
+    /// the Keychain ACL won't release without interactive approval — distinct
+    /// from a genuinely missing key.
+    private static func hint(blocked: Bool, envVar: String, suffix: String = "") -> String {
+        blocked
+            ? "key saved — Keychain needs approval; open Joint Chiefs and click \"Always Allow\", or set \(envVar)"
+            : "not configured — add via setup app or set \(envVar)\(suffix)"
     }
 }
 

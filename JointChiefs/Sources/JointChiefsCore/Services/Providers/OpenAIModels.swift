@@ -10,7 +10,7 @@ struct ChatMessage: Codable, Sendable {
 struct ChatCompletionRequest: Encodable, Sendable {
     let model: String
     let messages: [ChatMessage]
-    let temperature: Double
+    let temperature: Double?
     let responseFormat: ResponseFormat?
     let stream: Bool
 

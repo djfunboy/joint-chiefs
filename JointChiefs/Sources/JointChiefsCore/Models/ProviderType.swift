@@ -19,7 +19,7 @@ public enum ProviderType: String, Codable, CaseIterable, Sendable {
         case .openAI: "gpt-5.5"
         case .anthropic: "claude-opus-4-7"
         case .gemini: "gemini-3.1-pro-preview"
-        case .grok: "grok-4.20-0309-reasoning"
+        case .grok: "grok-4.3"
         case .ollama: "llama3"
         case .openAICompatible: ""
         }
@@ -49,23 +49,26 @@ public enum ProviderType: String, Codable, CaseIterable, Sendable {
                 "claude-opus-4-6",               // prior flagship
                 "claude-sonnet-4-6",             // balanced
                 "claude-haiku-4-5-20251001",     // fast + cheap
-                "claude-3-7-sonnet-latest"       // prior-gen fallback
+                "claude-sonnet-4-5-20250929"     // prior-gen sonnet fallback
             ]
         case .gemini:
             return [
                 "gemini-3.1-pro-preview",      // flagship (default)
                 "gemini-3-pro-preview",        // prior 3.x flagship
                 "gemini-2.5-pro",              // prior-gen flagship
-                "gemini-3.1-flash-lite-preview", // fast / cheap
-                "gemini-2.5-flash"             // fast / balanced fallback
+                "gemini-3-flash-preview",      // fast 3.x flash
+                "gemini-3.1-flash-lite"        // fast / cheap (GA)
             ]
         case .grok:
+            // xAI's currently-available chat models, verified against the live
+            // /v1/models endpoint on 2026-05-16. grok-4-* and grok-3 retired
+            // 2026-05-15 and no longer resolve — do not re-add them.
+            // grok-imagine-* are image/video models, not chat-capable.
             return [
-                "grok-4.20-0309-reasoning",     // flagship (default) — newest reasoning-tuned
-                "grok-4.20-0309-non-reasoning", // newest, faster (no chain-of-thought)
-                "grok-4-0709",                  // prior GA grok-4 base
-                "grok-4-fast-reasoning",        // fast + reasoning alias
-                "grok-code-fast-1"              // coding-specialized
+                "grok-4.3",                     // flagship (default)
+                "grok-4.20-0309-reasoning",     // prior reasoning model
+                "grok-4.20-0309-non-reasoning", // prior fast model
+                "grok-4.20-multi-agent-0309"    // multi-agent variant
             ]
         case .ollama:
             return []

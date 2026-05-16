@@ -140,7 +140,8 @@ public struct OpenAIProvider: ReviewProvider {
         let body = ChatCompletionRequest(
             model: model,
             messages: messages,
-            temperature: 0.2,
+            // Newer OpenAI reasoning models reject non-default temperature values.
+            temperature: nil,
             responseFormat: responseFormat,
             stream: true
         )

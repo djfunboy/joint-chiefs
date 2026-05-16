@@ -21,8 +21,8 @@ progress: CLI, stdio MCP server, and (still to come) a setup app.
 - **Per-provider model override:** `StrategyConfig.providerModels` lets users pick from `ProviderType.availableModels` (curated top 5 per provider) — resolution priority `providerModels[type]` > env var > `ProviderType.defaultModel`
 - **Setup app:** `jointchiefs-setup` SwiftUI executable shipping its full five-section installer — Usage / Keys / Roles & Weights / MCP Config / Privacy. All views use Agentdeck tokens (`agentBgPanel`, `AgentInputStyle`, `AgentPill`, `AgentChip`, `agentPanel`, `.agentPrimary` / `.agentSecondary` / `.agentDanger` button styles). CLI binaries install silently into `/opt/homebrew/bin` (or `~/.local/bin` fallback) on first launch — no manual destination picker.
 - **Website live at [jointchiefs.ai](https://jointchiefs.ai/)** — static site deployed via Netlify with auto-deploy on push to main. Source in the private `djfunboy/joint-chiefs-website` repo. Custom domain + Let's Encrypt cert configured.
-- **Eleven releases shipped:** v0.1.0 → v0.2.0 → v0.3.0 → v0.3.1 → v0.4.0 → v0.5.0 → v0.5.1 (docs-only) → v0.5.2 (Sparkle build-number hotfix) → v0.5.3 (curated model-list refresh — GPT-5.5, Claude Opus 4.7, Grok 4.20 reasoning) → v0.5.4 (OpenAI-compat dropdown UX + Gemini list refresh) → v0.5.5 (filter non-chat models from the OpenAI-compat dropdown). Notarized + stapled DMGs through v0.5.5; Sparkle appcast carries v0.5.0 + v0.5.2 + v0.5.3 + v0.5.4 + v0.5.5 (pre-v0.5.0 entries removed after the build-number bug — see `tasks/lessons.md` 2026-04-26). Homebrew cask SHA wired to v0.5.5.
-- **80 tests passing** (unit + orchestrator integration + consensus-mode coverage + weighted-voting + APIKeyResolver with fake-keygetter harness)
+- **Twelve releases shipped:** v0.1.0 → v0.2.0 → v0.3.0 → v0.3.1 → v0.4.0 → v0.5.0 → v0.5.1 (docs-only) → v0.5.2 (Sparkle build-number hotfix) → v0.5.3 (curated model-list refresh — GPT-5.5, Claude Opus 4.7, Grok 4.20 reasoning) → v0.5.4 (OpenAI-compat dropdown UX + Gemini list refresh) → v0.5.5 (filter non-chat models from the OpenAI-compat dropdown) → v0.5.6 (critical OpenAI `temperature` fix + full model-list refresh + MCP progress side-channels + in-context Keychain prompt). Notarized + stapled DMGs through v0.5.6; Sparkle appcast carries v0.5.0 + v0.5.2 + v0.5.3 + v0.5.4 + v0.5.5 + v0.5.6 (pre-v0.5.0 entries removed after the build-number bug — see `tasks/lessons.md` 2026-04-26). Homebrew cask SHA wired to v0.5.6.
+- **81 tests passing** (unit + orchestrator integration + consensus-mode coverage + weighted-voting + APIKeyResolver with fake-keygetter harness)
 
 Phases 1–3, 5, 8, and 10 are complete. Phase 6 (setup app) ships its full
 five-view installer with the v0.5.0 "Configured AI tools" panel surfacing
@@ -236,7 +236,7 @@ flat-sibling when it runs from `.build/release/` during development.
 **Goal:** Production-ready quality.
 
 **Steps:**
-1. ✅ Orchestrator integration tests with mock providers (80 tests passing — includes per-consensus-mode coverage, tiebreaker routing, weighted voting, `providerWeights` JSON round-trip, and APIKeyResolver fake-keygetter harness)
+1. ✅ Orchestrator integration tests with mock providers (81 tests passing — includes per-consensus-mode coverage, tiebreaker routing, weighted voting, `providerWeights` JSON round-trip, and APIKeyResolver fake-keygetter harness)
 2. ✅ Error handling audit for provider failure paths
 3. ✅ APIKeyResolver env/keygetter precedence covered with fake-keygetter harness
 4. [ ] Accessibility pass — VoiceOver/Dynamic Type on the setup app
@@ -244,7 +244,7 @@ flat-sibling when it runs from `.build/release/` during development.
 6. ✅ Documentation: README restructured for four-surface product (CLI, MCP, setup, keygetter); CLAUDE.md + all docs/*.md synced 2026-04-25
 
 **Checkpoint:**
-- [x] All tests pass (80 passing)
+- [x] All tests pass (81 passing)
 - [x] Zero warnings in build
 - [ ] VoiceOver works on all interactive elements — with Phase 6
 - [ ] Idle memory profiled
