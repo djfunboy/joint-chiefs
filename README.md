@@ -189,7 +189,7 @@ CLI flags:
 
 ```bash
 cd JointChiefs
-swift test          # 87 tests
+swift test          # 92 tests
 swift build -c release
 ```
 
