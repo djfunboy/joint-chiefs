@@ -33,7 +33,7 @@ A **three-surface product** distributed under MIT license at jointchiefs.ai:
 
 The dual-path design from v1 is dropped. **One updater library** serves all three binaries. Sparkle is removed entirely from the dependency graph. Reasons:
 
-- Two trust pipelines on the highest-risk surface = audit burden a solo project cannot sustain (panel HIGH-5).
+- Two trust pipelines on the highest-risk surface = audit burden a single-owner project cannot sustain (panel HIGH-5).
 - Sparkle's appcast format is a separate trust input from a custom `latest.json`, creating split-brain version semantics and key-rotation logic.
 - The CLI updater handles the only update-prompt UX users actually see (since the app is one-shot setup). The GUI rarely matters.
 
