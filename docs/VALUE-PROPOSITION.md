@@ -17,7 +17,7 @@ Ships as three user-facing surfaces plus one trust-anchor binary, one project:
 - **MCP server** (`jointchiefs-mcp`) — the primary integration. Drop it into any MCP-aware client. The host LLM calls `joint_chiefs_review` and gets back a consensus.
 - **CLI** (`jointchiefs`) — for setup, debugging, headless use, and CI pipelines. Same engine, scriptable.
 - **macOS setup app** (`jointchiefs-setup`) — one-shot installer GUI. Five sections: How to Use, API Keys (with live test buttons + curated model picker), Roles & Weights, MCP Config (with a "Configured AI tools" panel that scans your home dir for MCP-aware clients), and Privacy. CLI binaries install silently on first launch.
-- **Keygetter** (`jointchiefs-keygetter`) — the only signed binary allowed to read/write Joint Chiefs' Keychain items. The other three call it via `Process`. You'll never run it directly; it exists to keep your API keys behind a single ACL boundary.
+- **Keygetter** (`jointchiefs-keygetter`) — the only binary that reads or writes Joint Chiefs' credential file (`credentials.json`, mode `0600`). The other three call it via `Process`. You'll never run it directly; it exists to keep API-key access funnelled through one auditable path.
 
 ## Problem Statement
 
@@ -58,7 +58,7 @@ The three user-facing binaries share the same `JointChiefsCore` engine. The keyg
 | **MCP server** | Daily review from inside any MCP host | Tool-call invocation, host LLM passes code, consensus comes back inline |
 | **CLI** (`jointchiefs`) | Pre-commit hooks, CI, scripting, debugging a stuck debate, one-off audits | Streaming SSE output, JSON mode, exit codes, stdin piping |
 | **macOS setup app** | First install, key rotation, debate strategy tweaks, MCP wire-up verification | Live API key tests, curated model picker, standard MCP config snippet, moderator/consensus/tiebreaker config, "Configured AI tools" wire-up status, silent CLI install on first launch |
-| **Keygetter** (under the hood) | Never directly | Sole Keychain ACL identity — the other binaries `Process`-spawn it for every key read/write |
+| **Keygetter** (under the hood) | Never directly | Sole accessor of the `0600` credential file — the other binaries `Process`-spawn it for every key read/write |
 
 The app is not required to use the product. The CLI is not required to use the MCP server. The MCP server is not required to use the CLI. Pick one, two, or all three.
 

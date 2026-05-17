@@ -1,7 +1,7 @@
 # Joint Chiefs — Build Plan
 
-**Version:** 1.7
-**Last Updated:** 2026-04-26
+**Version:** 1.8
+**Last Updated:** 2026-05-17
 
 ## What's Built
 
@@ -10,7 +10,7 @@ progress: CLI, stdio MCP server, and (still to come) a setup app.
 
 - **CLI** (`jointchiefs`) — streaming multi-model review, same UX as v1
 - **MCP server** (`jointchiefs-mcp`) — stdio-only; initialize + tools/list smoke-tested
-- **Keygetter** (`jointchiefs-keygetter`) — single signed binary authoritative over Keychain access
+- **Keygetter** (`jointchiefs-keygetter`) — single binary that reads/writes the `0600` credential file
 - **`APIKeyResolver`** — env var first (CI fallback), then keygetter; CLI and MCP both funnel through it
 - **`StrategyConfig` + `StrategyConfigStore`** — moderator, consensus mode, tiebreaker, rounds, timeouts, rate limits, persisted to `~/Library/Application Support/Joint Chiefs/strategy.json`
 - **6 providers live:** OpenAI, Anthropic Claude, Gemini, Grok, Ollama, OpenAI-compatible (LM Studio / Jan / llama.cpp-server / Msty / LocalAI) — all SSE-streamed. Local options run side by side; Anthropic plays dual role as the default moderator and an optional spoke.
@@ -21,14 +21,14 @@ progress: CLI, stdio MCP server, and (still to come) a setup app.
 - **Per-provider model override:** `StrategyConfig.providerModels` lets users pick from `ProviderType.availableModels` (curated top 5 per provider) — resolution priority `providerModels[type]` > env var > `ProviderType.defaultModel`
 - **Setup app:** `jointchiefs-setup` SwiftUI executable shipping its full five-section installer — Usage / Keys / Roles & Weights / MCP Config / Privacy. All views use Agentdeck tokens (`agentBgPanel`, `AgentInputStyle`, `AgentPill`, `AgentChip`, `agentPanel`, `.agentPrimary` / `.agentSecondary` / `.agentDanger` button styles). CLI binaries install silently into `/opt/homebrew/bin` (or `~/.local/bin` fallback) on first launch — no manual destination picker.
 - **Website live at [jointchiefs.ai](https://jointchiefs.ai/)** — static site deployed via Netlify with auto-deploy on push to main. Source in the private `djfunboy/joint-chiefs-website` repo. Custom domain + Let's Encrypt cert configured.
-- **Twelve releases shipped:** v0.1.0 → v0.2.0 → v0.3.0 → v0.3.1 → v0.4.0 → v0.5.0 → v0.5.1 (docs-only) → v0.5.2 (Sparkle build-number hotfix) → v0.5.3 (curated model-list refresh — GPT-5.5, Claude Opus 4.7, Grok 4.20 reasoning) → v0.5.4 (OpenAI-compat dropdown UX + Gemini list refresh) → v0.5.5 (filter non-chat models from the OpenAI-compat dropdown) → v0.5.6 (critical OpenAI `temperature` fix + full model-list refresh + MCP progress side-channels + in-context Keychain prompt). Notarized + stapled DMGs through v0.5.6; Sparkle appcast carries v0.5.0 + v0.5.2 + v0.5.3 + v0.5.4 + v0.5.5 + v0.5.6 (pre-v0.5.0 entries removed after the build-number bug — see `tasks/lessons.md` 2026-04-26). Homebrew cask SHA wired to v0.5.6.
-- **81 tests passing** (unit + orchestrator integration + consensus-mode coverage + weighted-voting + APIKeyResolver with fake-keygetter harness)
+- **Thirteen releases shipped:** v0.1.0 → v0.2.0 → v0.3.0 → v0.3.1 → v0.4.0 → v0.5.0 → v0.5.1 (docs-only) → v0.5.2 (Sparkle build-number hotfix) → v0.5.3 (curated model-list refresh — GPT-5.5, Claude Opus 4.7, Grok 4.20 reasoning) → v0.5.4 (OpenAI-compat dropdown UX + Gemini list refresh) → v0.5.5 (filter non-chat models from the OpenAI-compat dropdown) → v0.5.6 (critical OpenAI `temperature` fix + full model-list refresh + MCP progress side-channels + in-context Keychain prompt) → v0.5.7 (API keys moved off the macOS Keychain into a `0600` `credentials.json` file so the CLI/MCP work headless; one-time legacy-Keychain migration). Notarized + stapled DMGs through v0.5.7; Sparkle appcast carries v0.5.0 + v0.5.2 + v0.5.3 + v0.5.4 + v0.5.5 + v0.5.6 + v0.5.7 (pre-v0.5.0 entries removed after the build-number bug — see `tasks/lessons.md` 2026-04-26). Homebrew cask SHA wired to v0.5.7.
+- **87 tests passing** (unit + orchestrator integration + consensus-mode coverage + weighted-voting + CredentialStore file-store coverage + APIKeyResolver with fake-keygetter harness)
 
 Phases 1–3, 5, 8, and 10 are complete. Phase 6 (setup app) ships its full
 five-view installer with the v0.5.0 "Configured AI tools" panel surfacing
 per-tool MCP wire-up status; remaining items are accessibility (VoiceOver /
-Dynamic Type) and a real-Keychain round-trip end-to-end test, both tracked
-under Phase 9.
+Dynamic Type) and a v0.5.6→v0.5.7 Keychain-migration round-trip test, both
+tracked under Phase 9.
 v2 security work is captured in tasks/SECURITY-AND-DIRECTION-PLAN-v2.md — with
 the lean baseline correction: Apple Developer ID + notarization + Sparkle,
 no YubiKey, no custom updater, no XPC.
@@ -151,14 +151,14 @@ open once, configure, quit.
 **Why now (vs. deferred in v1):** Two of v2's surfaces — the MCP server and
 (soon) a Developer-ID-signed CLI — are now on a distribution path where end
 users can't reasonably be asked to export env vars. The setup app is the
-surface that writes keys to the Keychain (via the keygetter) and persists
-`StrategyConfig`.
+surface that writes keys to the credential file (via the keygetter) and
+persists `StrategyConfig`.
 
 **Steps:**
 1. ✅ `StrategyConfig` type defined in `JointChiefsCore` — includes `providerWeights`, `providerModels`, `ollama`, `openAICompatible`, `rateLimits`
 2. ✅ `StrategyConfigStore` load/save helpers
 3. ✅ `APIKeyResolver` consumed by CLI + MCP (no direct env reads in hot paths); `writeViaKeygetter` / `deleteViaKeygetter` added for the setup app
-4. ✅ `jointchiefs-keygetter` executable as the sole Keychain identity
+4. ✅ `jointchiefs-keygetter` executable as the sole credential-file accessor (`CredentialStore`; `LegacyKeychainStore` for the v0.5.7 migration path)
 5. ✅ SwiftUI app target (`jointchiefs-setup`): provider-keys screen with masked entry, Save, Test, and Delete per key, plus a curated top-5 model picker per provider (`ProviderType.availableModels`)
 6. ✅ Roles & Weights panel: moderator picker, tiebreaker picker, consensus-mode picker, per-provider weight sliders (0 = excluded, >0 = voting weight), rounds/timeout sliders, voting-threshold slider, Ollama and OpenAI-compatible local-model configuration
 7. ✅ Silent CLI install on first launch (v0.3.0) — `SetupModel.installCLIIfNeeded()` copies `jointchiefs`, `jointchiefs-mcp`, and `jointchiefs-keygetter` into `/opt/homebrew/bin` (or `~/.local/bin` fallback) at `RootView.task` time. Replaced the earlier Install pane with a "How to Use" first-screen orientation view.
@@ -171,7 +171,7 @@ surface that writes keys to the Keychain (via the keygetter) and persists
 
 **Remaining (tracked under Phase 9):**
 - VoiceOver + Dynamic Type pass on all five sections (tokens + traits are wired; needs a live screen-reader smoke test)
-- Real-Keychain end-to-end round-trip test — currently smoke-tested via the keygetter's own exit-code contract
+- v0.5.6→v0.5.7 Keychain-migration round-trip test — the `CredentialStore` file store is unit-covered; the legacy-Keychain read half of `keygetter migrate` needs a real upgrade on a machine with v0.5.6 keys
 - Pre-flight validation: warn or disable Save when a provider is picked as moderator without a saved API key (still open from 04-23 UX review)
 
 **Build script** — `scripts/build-app.sh` runs `swift build -c release` and assembles `build/Joint Chiefs.app`:
@@ -296,3 +296,4 @@ reversed in favor of the standard Apple Developer flow.
 | 1.5 | 2026-04-25 | Phase 10 marked 🟢 COMPLETE — steps 5–11 reconciled with shipping reality (signing, notarization, DMG, Sparkle, redirect-stripping, MCP rate limits, SECURITY.md all landed across v0.1.0–v0.4.0). Sparkle integration note expanded to call out the v0.3.1 rpath hotfix that fixed the dyld-resolution failure in v0.2.0 + v0.3.0 cold-machine launches. |
 | 1.6 | 2026-04-25 | Phase 8 marked 🟢 COMPLETE — rate limits + StrategyConfig wiring reconciled with shipping reality across v0.3.x–v0.4.0 (Phase 8 steps 5–7 had been left stale while Phase 10 already showed them done). Phase 6 step 12 added: v0.5.0 "Configured AI tools" panel surfacing per-tool MCP wire-up status. Test count synced 60 → 80 in the "What's Built" section, Phase 9 step 1, and Phase 9 checkpoint. Top-of-doc status line updated to reflect the four-surface product shipping today. |
 | 1.7 | 2026-04-26 | Reconciled v0.4.0 + v0.3.0 + remaining v0.5.0 changes that drifted from "What's Built" and Phase 6. Bumped provider count 5 → 6 (added `OpenAICompatibleProvider` for LM Studio / Jan / llama.cpp-server / Msty / LocalAI; v0.4.0). Added `providerModels` per-provider model override (v0.3.0). Phase 6 header flipped from "🟢 SCAFFOLD + DESIGN-SYSTEM MIGRATION COMPLETE" → "🟢 COMPLETE." Phase 6 step 7 rewritten — the Install pane was replaced by silent auto-install on first launch (v0.3.0); UsageView is the new first screen. Phase 6 step 13 added: sidebar update-status footer (v0.5.0). Phase 2 step 5 added: `OpenAICompatibleProvider`. Six-release log added to "What's Built" (v0.1.0 → v0.5.0). Pre-flight moderator-key validation flagged as the remaining UX gap under Phase 9. |
+| 1.8 | 2026-05-17 | v0.5.7 — API keys moved off the macOS Keychain into a `0600` `credentials.json` file (`CredentialStore`) so the CLI and MCP server work headless; the Keychain's GUI access prompt can't be answered over SSH/cron. `KeychainService` → `LegacyKeychainStore` (read-only, migration path); `keygetter migrate` subcommand carries v0.5.6 keys forward. Release log updated to thirteen releases; test count 81 → 87 (CredentialStore coverage). Stale "Keychain" references reconciled across "What's Built", Phase 6, and Phase 9. |
