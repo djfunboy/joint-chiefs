@@ -18,7 +18,7 @@ Solo developers using AI coding assistants get a single model's perspective on c
 
 ### Solution
 
-Joint Chiefs is a four-surface product (CLI + stdio MCP server + macOS setup app + signed Keychain keygetter) that:
+Joint Chiefs is a four-surface product (CLI + stdio MCP server + macOS setup app + credential-file keygetter) that:
 1. Exposes an MCP server (`jointchiefs-mcp`) any MCP-aware client can spawn over stdio, so the host LLM calls `joint_chiefs_review` like any other tool
 2. Dispatches code to multiple configured LLM providers in parallel via `TaskGroup`
 3. Runs structured debate rounds where models see anonymized prior findings and challenge each other
@@ -118,7 +118,7 @@ Local transcript files written to disk. A UI for browsing them is deferred with 
 - No data loss on unexpected quit
 
 ### Security
-- API keys stored in macOS Keychain, accessed exclusively by the signed `jointchiefs-keygetter` binary
+- API keys stored in a permission-locked file (`credentials.json`, mode `0600`, encrypted at rest by FileVault), accessed exclusively by the `jointchiefs-keygetter` binary; keys from a pre-v0.5.7 Keychain are migrated automatically on first launch
 - MCP server is stdio-only — no listening ports, no network transports (architecturally prohibited)
 - CLI calls the orchestrator directly — no local HTTP server, no port binds
 - No telemetry, no external connections except configured LLM APIs
@@ -171,7 +171,7 @@ Local transcript files written to disk. A UI for browsing them is deferred with 
 2. **Universal trigger.** Any tool that can run a shell command or make an HTTP request works. No lock-in.
 3. **Opinionated defaults, full control.** Works great out of the box. Every parameter is configurable.
 4. **Graceful degradation.** If 1 of 3 models fails, the review continues with 2. Never block on a single provider.
-5. **Privacy first.** Localhost only. No telemetry. API keys in Keychain.
+5. **Privacy first.** Localhost only. No telemetry. API keys in a `0600` local file.
 6. **Research-backed debate.** The structured debate mechanism is grounded in Multi-Agent Debate (MAD) research (Liang et al., 2023; [arXiv:2305.19118](https://arxiv.org/abs/2305.19118)), which demonstrates that adversarial collaboration between multiple LLMs produces more accurate and reliable outputs than single-model inference or self-reflection. See `docs/RESEARCH.md` for implementation details.
 
 ## Success Metrics

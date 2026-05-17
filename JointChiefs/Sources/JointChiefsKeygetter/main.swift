@@ -1,35 +1,45 @@
 import Foundation
 import JointChiefsCore
 
-// The single binary permitted to touch Joint Chiefs' Keychain items. Every other
+// The single binary that touches Joint Chiefs' credential file. Every other
 // component (CLI, MCP server, setup app) invokes this via Process and reads the
-// key from stdout. The macOS Keychain ACL trusts exactly one signed identity
-// (com.jointchiefs.keygetter), so there is no cross-binary sharing problem.
+// key from stdout. Keeping one accessor means the file's read/write path is
+// auditable in exactly one place.
 //
-// Validated empirically in prototypes/keychain-access: writes from the app flow,
-// reads from the CLI context and from headless MCP invocations — all silent, no
-// dialogs, survives binary replacement on update.
+// As of v0.5.7 the backing store is `CredentialStore` — a 0600 JSON file at
+// ~/Library/Application Support/Joint Chiefs/credentials.json. This replaced the
+// macOS Keychain, whose GUI access prompt could not be answered by headless
+// CLI/MCP sessions (SSH, cron, no logged-in user). A file read has no session
+// or prompt dependency.
+//
+// The `migrate` subcommand moves keys left behind in the legacy Keychain
+// (v0.5.6 and earlier) into the file store; the setup app runs it once at
+// launch.
 //
 // Output contract:
-//   read:   raw key bytes on stdout, NO trailing newline
-//   write:  confirmation on stdout, key echo suppressed
-//   delete: confirmation on stdout
-//   errors: diagnostic line on stderr, non-zero exit
+//   read:    raw key bytes on stdout, NO trailing newline
+//   write:   confirmation on stdout, key echo suppressed
+//   delete:  confirmation on stdout
+//   migrate: summary line on stdout
+//   errors:  diagnostic line on stderr, non-zero exit
 //
 // Exit codes (stable — scripts and callers depend on these):
 //   0  success
-//   2  keychain failure (unexpected status, encode/decode)
+//   2  credential-file failure (unreadable, corrupt, write error)
 //   3  item not found (read only)
-//   4  keychain prompt required but interaction disabled (headless-failure case)
-//   5  other keychain error
+//   4  legacy: keychain prompt required but interaction disabled (unused by the
+//      file store; retained so older callers still map the code)
+//   5  other error
+//   6  legacy key found in the old Keychain — needs migration (read only)
 //   64 usage error
 
 enum ExitCode: Int32 {
     case success = 0
-    case keychainFailure = 2
+    case credentialFailure = 2
     case itemNotFound = 3
     case interactionNotAllowed = 4
-    case otherKeychain = 5
+    case otherError = 5
+    case legacyNeedsMigration = 6
     case usage = 64
 }
 
@@ -44,8 +54,12 @@ func usage() -> Never {
           jointchiefs-keygetter write <account> <key>
           jointchiefs-keygetter read <account>
           jointchiefs-keygetter delete <account>
+          jointchiefs-keygetter migrate
         """, .usage)
 }
+
+/// Provider accounts the `migrate` subcommand sweeps out of the legacy Keychain.
+let migratableAccounts = ["openai", "anthropic", "gemini", "grok"]
 
 let args = Array(CommandLine.arguments.dropFirst())
 guard let cmd = args.first else { usage() }
@@ -55,17 +69,20 @@ case "read":
     guard args.count == 2 else { usage() }
     let account = args[1]
     do {
-        let key = try KeychainService.retrieve(for: account)
+        let key = try CredentialStore.retrieve(for: account)
         FileHandle.standardOutput.write(Data(key.utf8))
         exit(ExitCode.success.rawValue)
-    } catch KeychainError.itemNotFound {
+    } catch CredentialStoreError.itemNotFound {
+        // No key in the file store. Before reporting "not found", probe the
+        // legacy Keychain — prompt-free, metadata only. A legacy item means the
+        // user upgraded from v0.5.6 without migrating; signal exit 6 so callers
+        // can point them at the setup app.
+        if LegacyKeychainStore.exists(for: account) {
+            die("legacy key for '\(account)' needs migration — open the Joint Chiefs app once", .legacyNeedsMigration)
+        }
         die("item not found: \(account)", .itemNotFound)
-    } catch KeychainError.unexpectedStatus(let status) where status == errSecInteractionNotAllowed {
-        die("keychain prompt required but interaction not allowed (headless)", .interactionNotAllowed)
-    } catch KeychainError.unexpectedStatus(let status) {
-        die("keychain status \(status)", .otherKeychain)
     } catch {
-        die("keychain failure: \(error.localizedDescription)", .keychainFailure)
+        die("read failed: \(error.localizedDescription)", .credentialFailure)
     }
 
 case "write":
@@ -73,23 +90,69 @@ case "write":
     let account = args[1]
     let key = args[2]
     do {
-        try KeychainService.store(apiKey: key, for: account)
+        try CredentialStore.store(apiKey: key, for: account)
         print("[keygetter] wrote \(account)")
         exit(ExitCode.success.rawValue)
     } catch {
-        die("write failed: \(error.localizedDescription)", .keychainFailure)
+        die("write failed: \(error.localizedDescription)", .credentialFailure)
     }
 
 case "delete":
     guard args.count == 2 else { usage() }
     let account = args[1]
     do {
-        try KeychainService.delete(for: account)
+        try CredentialStore.delete(for: account)
         print("[keygetter] deleted \(account)")
         exit(ExitCode.success.rawValue)
     } catch {
-        die("delete failed: \(error.localizedDescription)", .keychainFailure)
+        die("delete failed: \(error.localizedDescription)", .credentialFailure)
     }
+
+case "migrate":
+    guard args.count == 1 else { usage() }
+    var migrated: [String] = []
+    var alreadyPresent = 0
+    for account in migratableAccounts {
+        // Already in the file store — nothing to do.
+        if CredentialStore.accountExists(account) {
+            alreadyPresent += 1
+            continue
+        }
+        // Read the legacy item. This is the one operation that can surface a
+        // macOS access prompt — acceptable because `migrate` runs from the
+        // setup app while the user is present. A dismissed or failed read for
+        // one account is logged and skipped, never fatal.
+        let legacyKey: String
+        do {
+            legacyKey = try LegacyKeychainStore.retrieve(for: account)
+        } catch KeychainError.itemNotFound {
+            continue
+        } catch {
+            FileHandle.standardError.write(Data(
+                "[keygetter] migrate: skipped \(account) — \(error.localizedDescription)\n".utf8))
+            continue
+        }
+        // Write to the file store and verify the round-trip BEFORE deleting the
+        // legacy item — never destroy the only copy of a key.
+        do {
+            try CredentialStore.store(apiKey: legacyKey, for: account)
+            let verify = try CredentialStore.retrieve(for: account)
+            guard verify == legacyKey else {
+                FileHandle.standardError.write(Data(
+                    "[keygetter] migrate: verify mismatch for \(account) — legacy item kept\n".utf8))
+                continue
+            }
+        } catch {
+            FileHandle.standardError.write(Data(
+                "[keygetter] migrate: write failed for \(account) — \(error.localizedDescription); legacy item kept\n".utf8))
+            continue
+        }
+        try? LegacyKeychainStore.delete(for: account)
+        migrated.append(account)
+    }
+    let movedList = migrated.isEmpty ? "none" : migrated.joined(separator: ", ")
+    print("[keygetter] migrate: moved \(migrated.count) (\(movedList)), \(alreadyPresent) already in file store")
+    exit(ExitCode.success.rawValue)
 
 default:
     usage()

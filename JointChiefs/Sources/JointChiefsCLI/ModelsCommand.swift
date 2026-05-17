@@ -99,7 +99,7 @@ struct Models: AsyncParsableCommand {
         let icon: String
         if slot.isConfigured {
             icon = Glyph.star
-        } else if slot.keychainBlocked {
+        } else if slot.needsMigration {
             icon = Glyph.warn
         } else {
             icon = Glyph.empty
@@ -176,10 +176,10 @@ private struct ProviderSlot: Sendable {
     let displayName: String
     let model: String?
     let isConfigured: Bool
-    /// True when a key exists in the Keychain but its ACL needs a one-time
-    /// interactive approval — so the row reports "Keychain needs approval"
-    /// rather than the misleading "not configured".
-    let keychainBlocked: Bool
+    /// True when a key still lives in the old macOS Keychain and hasn't been
+    /// migrated into the credential file — so the row reports "open Joint Chiefs
+    /// once to migrate" rather than the misleading "not configured".
+    let needsMigration: Bool
     let unconfiguredHint: String
     private let providerFactory: @Sendable () -> (any ReviewProvider)?
 
@@ -188,7 +188,7 @@ private struct ProviderSlot: Sendable {
         displayName: String,
         model: String?,
         isConfigured: Bool,
-        keychainBlocked: Bool,
+        needsMigration: Bool,
         unconfiguredHint: String,
         providerFactory: @escaping @Sendable () -> (any ReviewProvider)?
     ) {
@@ -196,7 +196,7 @@ private struct ProviderSlot: Sendable {
         self.displayName = displayName
         self.model = model
         self.isConfigured = isConfigured
-        self.keychainBlocked = keychainBlocked
+        self.needsMigration = needsMigration
         self.unconfiguredHint = unconfiguredHint
         self.providerFactory = providerFactory
     }
@@ -215,8 +215,8 @@ private struct ProviderSlot: Sendable {
                 displayName: "OpenAI",
                 model: model,
                 isConfigured: resolved.key != nil,
-                keychainBlocked: resolved.blocked,
-                unconfiguredHint: hint(blocked: resolved.blocked, envVar: "OPENAI_API_KEY"),
+                needsMigration: resolved.needsMigration,
+                unconfiguredHint: hint(needsMigration: resolved.needsMigration, envVar: "OPENAI_API_KEY"),
                 providerFactory: { resolved.key.map { OpenAIProvider(apiKey: $0, model: model) } }
             )
 
@@ -228,8 +228,8 @@ private struct ProviderSlot: Sendable {
                 displayName: "Gemini",
                 model: model,
                 isConfigured: resolved.key != nil,
-                keychainBlocked: resolved.blocked,
-                unconfiguredHint: hint(blocked: resolved.blocked, envVar: "GEMINI_API_KEY"),
+                needsMigration: resolved.needsMigration,
+                unconfiguredHint: hint(needsMigration: resolved.needsMigration, envVar: "GEMINI_API_KEY"),
                 providerFactory: { resolved.key.map { GeminiProvider(apiKey: $0, model: model) } }
             )
 
@@ -241,8 +241,8 @@ private struct ProviderSlot: Sendable {
                 displayName: "Grok",
                 model: model,
                 isConfigured: resolved.key != nil,
-                keychainBlocked: resolved.blocked,
-                unconfiguredHint: hint(blocked: resolved.blocked, envVar: "GROK_API_KEY"),
+                needsMigration: resolved.needsMigration,
+                unconfiguredHint: hint(needsMigration: resolved.needsMigration, envVar: "GROK_API_KEY"),
                 providerFactory: { resolved.key.map { GrokProvider(apiKey: $0, model: model) } }
             )
 
@@ -254,8 +254,8 @@ private struct ProviderSlot: Sendable {
                 displayName: "Claude",
                 model: model,
                 isConfigured: resolved.key != nil,
-                keychainBlocked: resolved.blocked,
-                unconfiguredHint: hint(blocked: resolved.blocked, envVar: "ANTHROPIC_API_KEY", suffix: " (also the moderator)"),
+                needsMigration: resolved.needsMigration,
+                unconfiguredHint: hint(needsMigration: resolved.needsMigration, envVar: "ANTHROPIC_API_KEY", suffix: " (also the moderator)"),
                 providerFactory: { resolved.key.map { AnthropicProvider(apiKey: $0, model: model) } }
             )
 
@@ -267,7 +267,7 @@ private struct ProviderSlot: Sendable {
                 displayName: "Ollama",
                 model: enabled ? model : nil,
                 isConfigured: enabled,
-                keychainBlocked: false,
+                needsMigration: false,
                 unconfiguredHint: "disabled — set OLLAMA_ENABLED=1 for local models",
                 providerFactory: { enabled ? OllamaProvider(model: model) : nil }
             )
@@ -276,15 +276,17 @@ private struct ProviderSlot: Sendable {
 
     /// Resolve a provider's key for the listing.
     ///
-    /// Returns the key when available, plus a `blocked` flag set when the key
-    /// exists in the Keychain but its ACL needs a one-time interactive approval
-    /// the `models` command can't satisfy. That case must NOT be reported as
-    /// "not configured" — it has a different fix (approve the prompt, or set
-    /// the env var). Any other resolver error stays non-fatal: treated as
-    /// unconfigured here, surfaced by `--test`.
-    private static func resolveKey(_ provider: ProviderType) -> (key: String?, blocked: Bool) {
+    /// Returns the key when available, plus a `needsMigration` flag set when a
+    /// key still lives in the old macOS Keychain and hasn't been moved into the
+    /// credential file. That case must NOT be reported as "not configured" — it
+    /// has a specific fix (open the Joint Chiefs app once, or set the env var).
+    /// Any other resolver error stays non-fatal: treated as unconfigured here,
+    /// surfaced by `--test`.
+    private static func resolveKey(_ provider: ProviderType) -> (key: String?, needsMigration: Bool) {
         do {
             return (try APIKeyResolver.resolve(provider), false)
+        } catch APIKeyResolverError.legacyKeysNeedMigration {
+            return (nil, true)
         } catch APIKeyResolverError.interactionNotAllowed {
             return (nil, true)
         } catch {
@@ -292,12 +294,12 @@ private struct ProviderSlot: Sendable {
         }
     }
 
-    /// Trailing hint for a non-configured slot. A `blocked` slot has a saved key
-    /// the Keychain ACL won't release without interactive approval — distinct
-    /// from a genuinely missing key.
-    private static func hint(blocked: Bool, envVar: String, suffix: String = "") -> String {
-        blocked
-            ? "key saved — Keychain needs approval; open Joint Chiefs and click \"Always Allow\", or set \(envVar)"
+    /// Trailing hint for a non-configured slot. A `needsMigration` slot has a
+    /// saved key still in the old macOS Keychain — distinct from a genuinely
+    /// missing key.
+    private static func hint(needsMigration: Bool, envVar: String, suffix: String = "") -> String {
+        needsMigration
+            ? "key in old storage — open the Joint Chiefs app once to migrate it, or set \(envVar)"
             : "not configured — add via setup app or set \(envVar)\(suffix)"
     }
 }

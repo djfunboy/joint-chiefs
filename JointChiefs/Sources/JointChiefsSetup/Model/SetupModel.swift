@@ -42,7 +42,7 @@ final class SetupModel {
     /// True when the in-memory strategy diverges from what was last loaded/saved.
     private(set) var strategyIsDirty = false
 
-    // MARK: - Keys (not persisted in-memory — live in Keychain)
+    // MARK: - Keys (not persisted in-memory — live in the credential file)
 
     enum KeyStatus: Equatable {
         case unconfigured
@@ -87,11 +87,11 @@ final class SetupModel {
     var availableOpenAICompatibleModels: [String] = []
 
     /// Transient staging field — the user types into this, then the "Save" action
-    /// writes to the Keychain via the keygetter and clears the field.
+    /// writes to the credential file via the keygetter and clears the field.
     var keyDrafts: [ProviderType: String] = [:]
 
-    /// Live status per provider. Populated from initial Keychain probe plus
-    /// per-provider Test actions.
+    /// Live status per provider. Populated from an initial credential-store
+    /// probe plus per-provider Test actions.
     var keyStatuses: [ProviderType: KeyStatus] = [:]
 
     // MARK: - CLI install
@@ -119,21 +119,21 @@ final class SetupModel {
 
     init() {
         self.strategy = StrategyConfigStore.load()
-        // Don't probe the Keychain here — the first probe can block behind a
-        // macOS access-prompt dialog, which leaves the window blank until the
-        // user clicks through. Seed statuses to `.unconfigured` so the UI
-        // renders immediately, then call `refreshKeyStatuses()` from a `.task`
-        // modifier once the window is on screen.
+        // Seed statuses to `.unconfigured` so the UI renders immediately, then
+        // call `refreshKeyStatuses()` from a `.task` modifier once the window
+        // is on screen — the probe spawns the keygetter per provider, which is
+        // cheap but still better kept off the first-paint path.
         for type in ProviderType.allCases {
             keyStatuses[type] = .unconfigured
         }
     }
 
-    /// Async probe of the Keychain to detect existing keys. Runs after the window
-    /// is visible so any macOS access-prompt dialog doesn't stall the first paint.
+    /// Async probe of the credential store to detect existing keys. Runs after
+    /// the window is visible so the per-provider keygetter spawns don't stall
+    /// the first paint.
     func refreshKeyStatuses() async {
         for type in ProviderType.allCases {
-            guard let account = type.keychainAccount else {
+            guard let account = type.credentialAccount else {
                 keyStatuses[type] = .unconfigured // Ollama: local-only
                 continue
             }
@@ -398,32 +398,36 @@ final class SetupModel {
 
     // MARK: - Key mutations
 
+    /// Migrate any API keys still in the legacy macOS Keychain into the
+    /// file-based credential store. Idempotent — a no-op when there is nothing
+    /// to migrate. Runs once at launch, before `refreshKeyStatuses()`, so the
+    /// Keys screen reflects the post-migration state. Failures are non-fatal
+    /// and logged per-account by the keygetter.
+    func migrate() async {
+        try? APIKeyResolver.migrateViaKeygetter()
+    }
+
     func saveKey(_ key: String, for provider: ProviderType) async {
-        guard let account = provider.keychainAccount else { return }
+        guard let account = provider.credentialAccount else { return }
         do {
             try APIKeyResolver.writeViaKeygetter(account: account, key: key)
+            // Read the key straight back through a separate keygetter process.
+            // A file-store write that can't be read back is a silent failure;
+            // verifying here means Save genuinely confirms the round-trip.
+            let readback = try APIKeyResolver.readFromKeygetter(account: account)
+            guard readback == key else {
+                keyStatuses[provider] = .failed("Key saved but could not be read back.")
+                return
+            }
             keyStatuses[provider] = .saved
             keyDrafts[provider] = ""
         } catch {
             keyStatuses[provider] = .failed(error.localizedDescription)
-            return
-        }
-        // Warm-up read from a *separate* keygetter process. macOS scopes a
-        // Keychain item's ACL to the process context that created it; the first
-        // read from any other process triggers an "allow access" prompt. Firing
-        // that read here — while the setup app is foreground and the user is
-        // present — surfaces the prompt now (answer it with "Always Allow")
-        // instead of ambushing a headless CLI/MCP read later, where nobody can
-        // approve it and the key silently reads back as "not configured".
-        // Detached so the modal prompt doesn't block the window; the returned
-        // key is intentionally discarded — the call exists only to prompt.
-        Task.detached {
-            _ = try? APIKeyResolver.readFromKeygetter(account: account)
         }
     }
 
     func deleteKey(for provider: ProviderType) async {
-        guard let account = provider.keychainAccount else { return }
+        guard let account = provider.credentialAccount else { return }
         do {
             try APIKeyResolver.deleteViaKeygetter(account: account)
             keyStatuses[provider] = .unconfigured

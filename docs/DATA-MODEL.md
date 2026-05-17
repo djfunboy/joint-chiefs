@@ -121,7 +121,7 @@ public enum ProviderType: String, Codable, CaseIterable, Sendable {
     case openAI, anthropic, gemini, grok, ollama, openAICompatible
 
     public var envVarName: String              // CI-only fallback
-    public var keychainAccount: String?        // nil for Ollama and openAICompatible (no credential)
+    public var credentialAccount: String?      // credentials.json key; nil for Ollama and openAICompatible (no credential)
     public var defaultModel: String
     public var defaultEndpoint: String
     public var availableModels: [String]       // curated top-5 for the KeysView picker (empty for local providers)
@@ -132,6 +132,27 @@ Every concrete `ReviewProvider` exposes a `providerType` property so the
 orchestrator can map a provider instance back to its `StrategyConfig` weight
 without string matching.
 
+### credentials.json
+
+API keys are stored in `~/Library/Application Support/Joint Chiefs/credentials.json`
+— a flat JSON object keyed by `ProviderType.credentialAccount`, written with
+file mode `0600` (parent directory `0700`):
+
+```json
+{
+  "openai": "sk-…",
+  "anthropic": "sk-ant-…",
+  "gemini": "AIza…",
+  "grok": "xai-…"
+}
+```
+
+`CredentialStore` (mirroring `StrategyConfigStore`) reads and writes it
+atomically. It is the live API-key backend as of v0.5.7, replacing the macOS
+Keychain — a `0600` file is the only credential store that works for headless
+CLI/MCP invocations. `LegacyKeychainStore` retains read access to v0.5.6-era
+Keychain items solely for the one-time `keygetter migrate` path.
+
 ---
 
 ## Schema Overview (deferred menu bar app)
@@ -139,7 +160,9 @@ without string matching.
 > The rest of this document describes SwiftData models designed for the deferred
 > menu bar app (PRD F5/F7). Nothing below is live today — review transcripts
 > ship as Codable value types, settings as `StrategyConfig` above, and API keys
-> through the Keychain via the keygetter.
+> in `credentials.json` via the keygetter. The `keychainID` field and "Keychain
+> Storage" section in the deferred schema below predate the v0.5.7 file store;
+> they describe the menu-bar app's never-shipped design, not current behavior.
 
 ## Schema Overview
 

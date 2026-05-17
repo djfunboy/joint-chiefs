@@ -5,25 +5,26 @@ import Foundation
 ///   1. Environment variable (CI-only escape hatch; documented as such).
 ///   2. Spawning `jointchiefs-keygetter` via `Process` and reading stdout.
 ///
-/// The keygetter is the single signed binary permitted to touch Joint Chiefs'
-/// Keychain items — see `Sources/JointChiefsKeygetter/main.swift`. Every runtime
-/// caller (CLI, MCP server) funnels through this resolver so we only spawn and
-/// drop the key at the exact moment of use.
+/// The keygetter is the single binary that touches Joint Chiefs' credential
+/// file — see `Sources/JointChiefsKeygetter/main.swift`. Every runtime caller
+/// (CLI, MCP server) funnels through this resolver so we only spawn and drop
+/// the key at the exact moment of use.
 ///
 /// Returning `nil` means "this provider is not configured." Throwing means the
-/// provider is configured but access failed (keygetter crashed, keychain locked,
-/// etc.) — callers should surface that to the user rather than silently skip.
+/// provider is configured but access failed (keygetter crashed, credential
+/// file unreadable, etc.) — callers should surface that to the user rather than
+/// silently skip.
 public enum APIKeyResolver {
 
     // MARK: - Public API
 
     /// Resolve the API key for a given provider. Returns `nil` if neither the
-    /// env var nor the Keychain has a key for this provider.
+    /// env var nor the credential store has a key for this provider.
     public static func resolve(_ provider: ProviderType) throws -> String? {
         if let key = env(provider.envVarName), !key.isEmpty {
             return key
         }
-        guard let account = provider.keychainAccount else {
+        guard let account = provider.credentialAccount else {
             return nil
         }
         return try readFromKeygetter(account: account)
@@ -38,9 +39,9 @@ public enum APIKeyResolver {
         return try invoke(path: keygetterPath, arguments: ["read", account])
     }
 
-    /// Write a key via the keygetter. Used by the setup app so the Keychain ACL
-    /// stays bound to the single keygetter identity rather than each surface that
-    /// writes a key.
+    /// Write a key via the keygetter. Used by the setup app so credential-file
+    /// access stays funnelled through the single keygetter binary rather than
+    /// each surface writing the file directly.
     public static func writeViaKeygetter(account: String, key: String) throws {
         guard let keygetterPath = locateKeygetter() else {
             throw APIKeyResolverError.keygetterFailed(
@@ -60,6 +61,20 @@ public enum APIKeyResolver {
             )
         }
         _ = try invoke(path: keygetterPath, arguments: ["delete", account])
+    }
+
+    /// Run the keygetter `migrate` subcommand — moves any API keys still in the
+    /// legacy macOS Keychain into the file-based credential store. Idempotent;
+    /// a no-op when there are no legacy keys. Called once by the setup app at
+    /// launch so v0.5.6-and-earlier users carry their keys forward silently.
+    public static func migrateViaKeygetter() throws {
+        guard let keygetterPath = locateKeygetter() else {
+            throw APIKeyResolverError.keygetterFailed(
+                exitCode: -1,
+                stderr: "keygetter binary not found"
+            )
+        }
+        _ = try invoke(path: keygetterPath, arguments: ["migrate"])
     }
 
     // MARK: - Keygetter Discovery
@@ -128,8 +143,8 @@ public enum APIKeyResolver {
     /// Spawn the keygetter, capture stdout, and return the trimmed key.
     ///
     /// - Returns: The key, or `nil` if the keygetter reports `item not found` (exit 3).
-    /// - Throws: `APIKeyResolverError` for other keygetter failures (interaction
-    ///           disabled, keychain error, spawn failure, etc.).
+    /// - Throws: `APIKeyResolverError` for other keygetter failures (legacy keys
+    ///           awaiting migration, credential-file error, spawn failure, etc.).
     private static func invoke(path: String, arguments: [String]) throws -> String? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: path)
@@ -161,6 +176,8 @@ public enum APIKeyResolver {
             return nil
         case 4:
             throw APIKeyResolverError.interactionNotAllowed
+        case 6:
+            throw APIKeyResolverError.legacyKeysNeedMigration
         default:
             let message = String(data: stderrData, encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? "unknown error"
@@ -179,6 +196,7 @@ public enum APIKeyResolverError: Error, LocalizedError, Sendable {
     case spawnFailed(path: String, underlying: Error)
     case decodeFailed
     case interactionNotAllowed
+    case legacyKeysNeedMigration
     case keygetterFailed(exitCode: Int32, stderr: String)
 
     public var errorDescription: String? {
@@ -188,7 +206,9 @@ public enum APIKeyResolverError: Error, LocalizedError, Sendable {
         case .decodeFailed:
             "Keygetter returned invalid UTF-8 output."
         case .interactionNotAllowed:
-            "Keychain access needs a one-time approval that can't be answered in a headless context. Open Joint Chiefs once and click \"Always Allow\" on the prompt, or set the provider's API-key environment variable for headless use."
+            "Could not read the stored API key. Set the provider's API-key environment variable for headless use, or re-save the key in the Joint Chiefs setup app."
+        case .legacyKeysNeedMigration:
+            "An API key is still in the old macOS Keychain storage. Open the Joint Chiefs app once to migrate it — afterward the CLI and headless agents can read it without prompts."
         case .keygetterFailed(let code, let stderr):
             "Keygetter exited with status \(code): \(stderr)"
         }
@@ -199,7 +219,7 @@ public enum APIKeyResolverError: Error, LocalizedError, Sendable {
 
 extension ProviderType {
 
-    /// Environment variable consulted before the Keychain (CI escape hatch).
+    /// Environment variable consulted before the credential store (CI escape hatch).
     public var envVarName: String {
         switch self {
         case .openAI: "OPENAI_API_KEY"
@@ -211,12 +231,12 @@ extension ProviderType {
         }
     }
 
-    /// Keychain account name for this provider. Ollama is local-only and has no
-    /// stored credential, so it returns nil. OpenAI-compatible providers store
-    /// their (usually-empty) key directly in `StrategyConfig.openAICompatible.apiKey`
-    /// rather than in the Keychain — simpler for the 95% case where local servers
-    /// don't authenticate.
-    public var keychainAccount: String? {
+    /// Credential-store account name for this provider. Ollama is local-only
+    /// and has no stored credential, so it returns nil. OpenAI-compatible
+    /// providers store their (usually-empty) key directly in
+    /// `StrategyConfig.openAICompatible.apiKey` rather than in the credential
+    /// store — simpler for the 95% case where local servers don't authenticate.
+    public var credentialAccount: String? {
         switch self {
         case .openAI: "openai"
         case .anthropic: "anthropic"
