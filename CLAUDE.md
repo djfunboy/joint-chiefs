@@ -6,7 +6,7 @@
 Multi-model AI code review orchestrator. Four surfaces — CLI, stdio MCP server, macOS setup app, and a single credential-file-access binary — all built from one `JointChiefsCore` engine. Sends code to multiple LLMs, runs a structured hub-and-spoke debate with Claude as moderator/decider, and streams a consensus summary back. Grounded in Multi-Agent Debate (MAD) research showing debate improves factuality and reasoning over single-model output.
 
 **Website:** https://jointchiefs.ai/ (live — source in the private `djfunboy/joint-chiefs-website` repo; this repo is the app)
-**Latest release:** v0.5.7 — API keys moved off the macOS Keychain into a permission-locked `0600` file (`~/Library/Application Support/Joint Chiefs/credentials.json`). The Keychain's access-approval is a GUI prompt a headless CLI/MCP session (SSH, cron, no logged-in user) cannot answer; a file read has no session or prompt dependency, and FileVault encrypts it at rest. New `CredentialStore` is the live backend; `KeychainService` → `LegacyKeychainStore` (read-only) plus a one-time `keygetter migrate` subcommand carry v0.5.6 Keychain keys forward on first launch. The keygetter binary name and its `read`/`write`/`delete` `Process` contract are unchanged — only the storage backend swapped. 87 tests. CFBundleVersion `1777000005`. Builds on v0.5.6.
+**Latest release:** v0.5.8 — hard-coded anti-over-engineering calibration in the review prompts. A hub-and-spoke debate escalates "thoroughness" — each round a model justifies its turn by finding more, so output drifted toward nitpicks, speculative edge cases, and over-engineering suggestions, with no calibration anywhere in the prompt chain. All review/debate/moderator prompts are now centralized in `ReviewPrompts.swift` (they were byte-identical copy-paste across 5 provider files) and carry a proportionality posture: a finding must clear a real bar (correctness, security, maintainability that will bite, or the stated goal); debate rounds are reframed converge-and-cut rather than accumulate; the moderator cuts anything not worth shipping over (cap 15 → 10). The moderator inherits `reviewSystem`, so it is calibrated twice. `OpenAICompatibleProvider` is a decorator and was untouched. 92 tests. CFBundleVersion `1777000006`. Builds on v0.5.7.
 **Next session:** start by reading the most recent `tasks/SESSION-HANDOFF-*.md` (gitignored; local-only).
 
 ## Current State
@@ -19,7 +19,7 @@ Multi-model AI code review orchestrator. Four surfaces — CLI, stdio MCP server
 - **6 providers working:** OpenAI, Anthropic Claude, Gemini, Grok, plus two local options — Ollama (native protocol) and any OpenAI-compatible server (LM Studio, Jan, llama.cpp-server, Msty, LocalAI). Local options are independent — both can run side by side.
 - **Streaming SSE** on every provider — tokens appear live as each model speaks.
 - **Hub-and-spoke debate:** spokes produce findings; the moderator (Claude by default) synthesizes rounds and writes the final anonymous consensus. 4 consensus modes: `moderatorDecides`, `strictMajority`, `bestOfAll`, `votingThreshold` (with per-provider weighting).
-- **81 tests passing.** No performance profiling done yet.
+- **92 tests passing.** No performance profiling done yet.
 
 ## Key Rules
 
