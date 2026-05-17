@@ -69,9 +69,9 @@ fallback if the moderator is unavailable.
 | Setup app | SwiftUI + `@Observable` (Agentdeck design system) | One-shot installer for keys, strategy, MCP config, CLI install |
 | CLI | Swift ArgumentParser | `jointchiefs` command-line tool |
 | MCP server | `modelcontextprotocol/swift-sdk` 0.12.0 (stdio transport) | `jointchiefs-mcp` exposes `joint_chiefs_review` |
-| Keychain | Single signed binary (`jointchiefs-keygetter`) | Sole identity authorized to read/write Joint Chiefs Keychain items |
+| Credential access | Single binary (`jointchiefs-keygetter`) | Sole reader/writer of the local API-key file; one-time legacy-Keychain migration |
 | Persistence | `StrategyConfig` JSON + local transcript files | `~/Library/Application Support/Joint Chiefs/strategy.json` (mode 0600). SwiftData reserved for the deferred menu bar app (PRD F5) |
-| Secrets | macOS Keychain (via keygetter) | API key storage |
+| Secrets | `credentials.json` (mode 0600, via keygetter) | API key storage — `~/Library/Application Support/Joint Chiefs/credentials.json` |
 | Networking | URLSession | LLM API calls |
 | API Calls | `URLSession.bytes` (SSE streaming) | Stream LLM responses, no timeouts |
 | Auto-update | Sparkle 2.x (app bundle only) | Bundled CLI + MCP binaries re-installed via setup app on update |
@@ -90,8 +90,9 @@ JointChiefs/
 │   │   │   └── StrategyConfig.swift         (moderator/tiebreaker/consensus/rounds/timeout/providerWeights)
 │   │   ├── Errors/
 │   │   └── Services/
-│   │       ├── APIKeyResolver.swift         (env → keygetter; read/write/delete; CLI + MCP + setup app funnel through it)
-│   │       ├── KeychainService.swift        (used *only* by the keygetter binary)
+│   │       ├── APIKeyResolver.swift         (env → keygetter; read/write/delete/migrate; CLI + MCP + setup app funnel through it)
+│   │       ├── CredentialStore.swift         (0600 credentials.json file store — the live API-key backend)
+│   │       ├── LegacyKeychainStore.swift     (read-only access to v0.5.6 Keychain keys; migration path only)
 │   │       ├── StrategyConfigStore.swift    (load/save ~/Library/Application Support/…)
 │   │       ├── ProviderFactory.swift        (panel assembly; filters `weight == 0`; moderator/tiebreaker builders)
 │   │       ├── ConsensusBuilder.swift
@@ -103,7 +104,7 @@ JointChiefs/
 │   └── JointChiefsSetup/                     (executable: jointchiefs-setup — SwiftUI one-shot installer)
 │       ├── SetupApp.swift                   (@main, AppKit delegate for foreground activation)
 │       ├── Model/
-│       │   ├── SetupModel.swift             (@Observable @MainActor state; probes Keychain + silent CLI install on launch)
+│       │   ├── SetupModel.swift             (@Observable @MainActor state; legacy-key migration + credential probe + silent CLI install on launch)
 │       │   ├── UpdaterService.swift         (Sparkle wrapper; drives sidebar update-status footer)
 │       │   └── MCPConfigScanner.swift       (generic MCP-server detector for the "Configured AI tools" panel)
 │       └── Views/                           (RootView, UsageView, KeysView, RolesWeightsView, MCPConfigView, DisclosureView)
@@ -185,10 +186,10 @@ without requiring shell surgery. Five sections, navigable via a sidebar
   summary — and shows exactly how to invoke it from a terminal or any AI
   client with MCP configured. Includes the natural-language AI prompt and
   CLI invocation examples with Copy buttons.
-- **API Keys** — masked entry per provider. Save writes to the Keychain via
-  `APIKeyResolver.writeViaKeygetter`; Test resolves the key and runs
-  `ReviewProvider.testConnection()`; Delete calls
-  `APIKeyResolver.deleteViaKeygetter`. Each provider row has a Model picker
+- **API Keys** — masked entry per provider. Save writes to the credential
+  file via `APIKeyResolver.writeViaKeygetter` and reads it back to verify the
+  round-trip; Test resolves the key and runs `ReviewProvider.testConnection()`;
+  Delete calls `APIKeyResolver.deleteViaKeygetter`. Each provider row has a Model picker
   driven by `ProviderType.availableModels` (top 5 curated). Ollama and any
   OpenAI-compatible local server (LM Studio, Jan, llama.cpp-server, Msty,
   LocalAI) are configured here too — both are independent and can run side
@@ -200,8 +201,8 @@ without requiring shell surgery. Five sections, navigable via a sidebar
   `StrategyConfigStore.save(_:)`.
 - **MCP Config** — generates a standard `mcpServers` JSON snippet that points
   at the installed `jointchiefs-mcp` path. Works with any MCP client. No key
-  material in the snippet — keys live in the Keychain, resolved at tool-call
-  time. The "Configured AI tools" panel (v0.5.0) walks home-dir conventional
+  material in the snippet — keys live in the local credential file, resolved
+  at tool-call time. The "Configured AI tools" panel (v0.5.0) walks home-dir conventional
   config locations, structurally confirms each MCP-server stanza, and reports
   per-tool wire-up status with a "wired in M of N" pill. Detection is by
   stanza shape (JSON `mcpServers` map, TOML `[mcp_servers...]` table) — never
@@ -222,18 +223,31 @@ inline spinner during user-triggered checks. `UpdaterService` skips Sparkle
 init when running outside an app bundle so dev builds via `swift run` don't
 hit the "updater failed to start" modal.
 
-The setup app talks to the Keychain *only* through the keygetter for the same
-reason the CLI and MCP server do — see the keygetter section below. It does
-not link against `Security.framework` directly.
+The setup app reaches the credential file *only* through the keygetter for the
+same reason the CLI and MCP server do — see the keygetter section below.
+
+### Credential storage: `CredentialStore` and `LegacyKeychainStore`
+
+API keys are stored in `~/Library/Application Support/Joint Chiefs/credentials.json`
+— a flat JSON object (`{ "openai": "sk-…", … }`) written with file mode `0600`
+and a parent directory of `0700`. `CredentialStore` mirrors `StrategyConfigStore`:
+same app-support directory resolution, atomic write, permission hardening.
+
+This replaced the macOS Keychain as of v0.5.7. The Keychain's access approval
+is an interactive GUI prompt; a headless CLI/MCP session (SSH, cron, no
+logged-in user) cannot show or answer it, so saved keys were unreadable in
+exactly the contexts the product targets. A `0600` file has no session or
+prompt dependency, and FileVault provides encryption at rest. `LegacyKeychainStore`
+remains for one purpose only: the one-time `keygetter migrate` path, which
+reads any v0.5.6-era Keychain items and moves them into the file. Nothing
+writes the Keychain anymore.
 
 ### APIKeyResolver and `jointchiefs-keygetter`
 
-Instead of embedding Keychain access in every binary, only one signed binary
-(`jointchiefs-keygetter`) is permitted to touch Joint Chiefs' Keychain items.
-The CLI and MCP server invoke it via `Process` and read the key from stdout.
-This was validated empirically in `prototypes/keychain-access/` — a single
-trusted identity avoids cross-binary ACL churn when any of the surfaces is
-updated in place.
+Instead of embedding credential-file access in every binary, only one binary
+(`jointchiefs-keygetter`) reads or writes `credentials.json`. The CLI and MCP
+server invoke it via `Process` and read the key from stdout — the file's
+access path is auditable in exactly one place.
 
 Resolution priority:
 
@@ -251,10 +265,11 @@ Exit code contract (callers depend on these):
 | Exit | Meaning |
 |---|---|
 | 0 | Success — key on stdout |
-| 2 | Keychain encode/decode failure |
+| 2 | Credential-file failure (unreadable, corrupt, write error) |
 | 3 | Item not found (resolver returns nil, not an error) |
-| 4 | Interaction required (headless failure — throws) |
-| 5 | Other keychain error |
+| 4 | Legacy: Keychain interaction required (unused by the file store; retained so older callers still map the code) |
+| 5 | Other error |
+| 6 | Legacy key found in the old Keychain — needs migration (resolver throws `legacyKeysNeedMigration`) |
 | 64 | Usage error |
 
 ## Data Flow
@@ -337,7 +352,7 @@ streaming rather than waiting for the full response body.
 
 Provider API keys are resolved via `APIKeyResolver` (env var → keygetter). The
 env var is a CI-only escape hatch; end users add keys via the setup app, which
-writes them to the Keychain through the keygetter.
+writes them to the `credentials.json` file through the keygetter.
 
 Other settings — moderator selection, consensus mode, tiebreaker, rounds,
 timeouts, rate limits, per-provider weights — live in `StrategyConfig` and are
@@ -387,10 +402,12 @@ Claude model for per-round reviews and a larger one for the final call.
 
 ## Security Model
 
-- **API keys** live in the macOS Keychain, accessed exclusively by a single
-  signed binary (`jointchiefs-keygetter`). The CLI and MCP server invoke it
-  via `Process` and drop the key immediately after use — see the
-  `APIKeyResolver` and keygetter sections above.
+- **API keys** live in a permission-locked file (`credentials.json`, mode
+  `0600`), accessed exclusively by the `jointchiefs-keygetter` binary. The CLI
+  and MCP server invoke it via `Process` and drop the key immediately after
+  use — see the `CredentialStore`, `APIKeyResolver`, and keygetter sections
+  above. FileVault encrypts the file at rest; a `0600` file is the standard
+  server-side credential pattern and the only one that works headless.
 - **Env vars are CI-only fallback.** Documented as such in SECURITY.md and
   the setup app's first-run screen. Not the default path for end users.
 - **No local HTTP server.** The CLI calls the orchestrator directly; the MCP

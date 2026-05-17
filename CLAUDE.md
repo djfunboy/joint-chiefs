@@ -3,7 +3,7 @@
 
 **Goal:** Public MIT-licensed open-source tool in a portfolio of ~10 apps, operated by a single owner with strong product and business instincts. Success path is adoption and acquisition value, not direct revenue — "users" means downloads, stars, and integration into other workflows; exact counts aren't tracked. Reliability beats features: every fix should reduce friction or breakage, not add surface area. Prefer minimal correct changes. Don't propose monetization, premium tiers, or scale infrastructure unless explicitly asked — the owner will raise those when relevant.
 
-Multi-model AI code review orchestrator. Four surfaces — CLI, stdio MCP server, macOS setup app, and a single Keychain-access binary — all built from one `JointChiefsCore` engine. Sends code to multiple LLMs, runs a structured hub-and-spoke debate with Claude as moderator/decider, and streams a consensus summary back. Grounded in Multi-Agent Debate (MAD) research showing debate improves factuality and reasoning over single-model output.
+Multi-model AI code review orchestrator. Four surfaces — CLI, stdio MCP server, macOS setup app, and a single credential-file-access binary — all built from one `JointChiefsCore` engine. Sends code to multiple LLMs, runs a structured hub-and-spoke debate with Claude as moderator/decider, and streams a consensus summary back. Grounded in Multi-Agent Debate (MAD) research showing debate improves factuality and reasoning over single-model output.
 
 **Website:** https://jointchiefs.ai/ (live — source in the private `djfunboy/joint-chiefs-website` repo; this repo is the app)
 **Latest release:** v0.5.6 — critical OpenAI fix: v0.5.5 sent `temperature: 0.2`, which every `gpt-5.x` model 400-rejects, so OpenAI reviews failed outright; the parameter is now omitted (regression-tested). Also: full provider model-list refresh against live endpoints (Grok default → `grok-4.3`; Gemini and Anthropic pickers refreshed), MCP progress side-channels (`ProgressBroadcaster` — stderr heartbeats + a `current-review.json` status file), and an in-context Keychain fix — the setup app fires a warm-up read after Save so macOS surfaces its access prompt while the user is present, instead of ambushing a later headless CLI/MCP read. CFBundleVersion `1777000004`. Builds on v0.5.5.
@@ -11,11 +11,11 @@ Multi-model AI code review orchestrator. Four surfaces — CLI, stdio MCP server
 
 ## Current State
 
-- **Phases 1–3, 5, 8, and 10 complete.** Phase 6 (setup app) ships its full five-view installer with the v0.5.0 "Configured AI tools" panel showing per-tool MCP wire-up status; remaining items are accessibility (VoiceOver / Dynamic Type) and a real-Keychain end-to-end round-trip test, both tracked under Phase 9. Website live at jointchiefs.ai with notarized DMGs + Sparkle appcast through v0.5.6.
+- **Phases 1–3, 5, 8, and 10 complete.** Phase 6 (setup app) ships its full five-view installer with the v0.5.0 "Configured AI tools" panel showing per-tool MCP wire-up status; remaining items are accessibility (VoiceOver / Dynamic Type) and a v0.5.6→v0.5.7 Keychain-migration round-trip test, both tracked under Phase 9. Website live at jointchiefs.ai with notarized DMGs + Sparkle appcast through v0.5.6.
 - **CLI installed** at `/opt/homebrew/bin/jointchiefs` (Apple Silicon only). Calls the orchestrator directly — no local HTTP server.
 - **MCP server** at `jointchiefs-mcp` — stdio-only, wraps the orchestrator via `modelcontextprotocol/swift-sdk` pinned exact 0.12.0. Spawned by any MCP-aware client via JSON-RPC over stdio.
-- **Setup app** at `jointchiefs-setup` — one-shot SwiftUI installer (Usage / Keys / Roles & Weights / MCP Config / Privacy). All five views use Agentdeck tokens end-to-end. CLI binaries install silently on first launch — no manual destination picker. Keychain access goes through the keygetter only.
-- **Keygetter** at `jointchiefs-keygetter` — the single signed identity authorized to read/write Joint Chiefs' Keychain items. CLI, MCP server, and setup app all invoke it via `Process`.
+- **Setup app** at `jointchiefs-setup` — one-shot SwiftUI installer (Usage / Keys / Roles & Weights / MCP Config / Privacy). All five views use Agentdeck tokens end-to-end. CLI binaries install silently on first launch — no manual destination picker. Credential-file access goes through the keygetter only; the app runs a one-time legacy-Keychain migration at launch.
+- **Keygetter** at `jointchiefs-keygetter` — the single binary that reads and writes Joint Chiefs' credential file (`credentials.json`, mode 0600). CLI, MCP server, and setup app all invoke it via `Process`.
 - **6 providers working:** OpenAI, Anthropic Claude, Gemini, Grok, plus two local options — Ollama (native protocol) and any OpenAI-compatible server (LM Studio, Jan, llama.cpp-server, Msty, LocalAI). Local options are independent — both can run side by side.
 - **Streaming SSE** on every provider — tokens appear live as each model speaks.
 - **Hub-and-spoke debate:** spokes produce findings; the moderator (Claude by default) synthesizes rounds and writes the final anonymous consensus. 4 consensus modes: `moderatorDecides`, `strictMajority`, `bestOfAll`, `votingThreshold` (with per-provider weighting).
@@ -46,17 +46,17 @@ Multi-model AI code review orchestrator. Four surfaces — CLI, stdio MCP server
 - **CLI:** Swift executable (`jointchiefs`), ArgumentParser, streaming output
 - **MCP server:** Swift executable (`jointchiefs-mcp`), stdio transport, `modelcontextprotocol/swift-sdk` 0.12.0
 - **Setup app:** Swift executable (`jointchiefs-setup`), SwiftUI + `@Observable`, Agentdeck design system
-- **Keygetter:** Swift executable (`jointchiefs-keygetter`), sole Keychain identity
+- **Keygetter:** Swift executable (`jointchiefs-keygetter`), sole credential-file accessor
 - **Providers:** OpenAI, Anthropic Claude, Google Gemini, xAI Grok, Ollama, OpenAI-compatible (LM Studio / Jan / llama.cpp-server / Msty / LocalAI) — all via REST with SSE streaming
 - **Orchestrator:** Hub-and-spoke — Claude moderates by default; spokes can be any of the other providers
-- **Storage:** `StrategyConfig` JSON at `~/Library/Application Support/Joint Chiefs/strategy.json` (file mode 0600); local transcript files for reviews; API keys in Keychain via keygetter
+- **Storage:** `StrategyConfig` JSON at `~/Library/Application Support/Joint Chiefs/strategy.json` (file mode 0600); local transcript files for reviews; API keys in `credentials.json` (same directory, file mode 0600) via keygetter
 
 ## Configuration
 
 API keys are resolved via `APIKeyResolver`:
 
 1. **Environment variables** (CI-only fallback): `OPENAI_API_KEY`, `GEMINI_API_KEY`, `GROK_API_KEY`, `ANTHROPIC_API_KEY`
-2. **Keygetter → Keychain** (end-user default): written by the setup app's Save button, read by the CLI + MCP server at invocation time
+2. **Keygetter → `credentials.json`** (end-user default): a `0600` file written by the setup app's Save button, read by the CLI + MCP server at invocation time. Replaced the macOS Keychain in v0.5.7 — a file read has no GUI-prompt dependency, so it works headless. The setup app migrates pre-v0.5.7 Keychain keys on first launch.
 
 Optional model overrides (env vars): `OPENAI_MODEL`, `GEMINI_MODEL`, `GROK_MODEL`, `ANTHROPIC_MODEL`, `CONSENSUS_MODEL`.
 
@@ -81,7 +81,7 @@ Joint Chiefs/                          (github.com/djfunboy/joint-chiefs — pub
 ├── JointChiefs/                       ← Swift Package
 │   ├── Package.swift
 │   ├── Sources/
-│   │   ├── JointChiefsCore/           ← Models, providers, orchestrator, keychain, APIKeyResolver
+│   │   ├── JointChiefsCore/           ← Models, providers, orchestrator, credential store, APIKeyResolver
 │   │   ├── JointChiefsCLI/            ← jointchiefs executable
 │   │   ├── JointChiefsMCP/            ← jointchiefs-mcp executable (stdio)
 │   │   ├── JointChiefsSetup/          ← jointchiefs-setup SwiftUI executable
@@ -111,7 +111,7 @@ The website is deployed to [jointchiefs.ai](https://jointchiefs.ai) via Netlify.
 - **Provider protocol:** All LLM providers conform to `ReviewProvider` and expose `providerType` so the orchestrator can map a provider instance back to its `StrategyConfig` weight.
 - **Hub-and-spoke orchestrator:** `DebateOrchestrator` fans out to spokes in parallel via `TaskGroup`, feeds anonymized findings to the moderator, runs up to 5 rounds with an adaptive break when consensus is reached, then synthesizes the final summary through one of four consensus modes.
 - **Anonymous synthesis:** Model identities are stripped before the final decision to reduce bias toward any single provider.
-- **Single Keychain identity:** All Keychain reads/writes go through `jointchiefs-keygetter`. Other binaries call it via `Process`. Empirically validated in `prototypes/keychain-access/` — a single trusted identity avoids cross-binary ACL churn when any surface updates in place.
+- **Single credential-file accessor:** All `credentials.json` reads/writes go through `jointchiefs-keygetter`. Other binaries call it via `Process`, so the file's access path is auditable in one place. The file store (`CredentialStore`) replaced the macOS Keychain in v0.5.7 — the Keychain's GUI access prompt can't be answered by a headless CLI/MCP session; `LegacyKeychainStore` remains only for the one-time `keygetter migrate` path.
 
 ## Project Docs
 

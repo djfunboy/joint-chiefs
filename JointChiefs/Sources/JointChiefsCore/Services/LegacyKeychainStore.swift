@@ -1,58 +1,49 @@
 import Foundation
 import Security
 
-/// Provides secure storage for provider API keys using the macOS Keychain.
+/// Read-only access to API keys left in the macOS Keychain by Joint Chiefs
+/// v0.5.6 and earlier.
 ///
-/// Security model:
-/// - Items use `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` — keys are device-local
-///   and excluded from backups/iCloud migration.
-/// - No biometric/user-presence gating — appropriate for frequently-accessed API keys.
-/// - Swift String values remain in memory until deallocated (platform limitation).
-public enum KeychainService {
+/// As of v0.5.7 keys live in `CredentialStore` (a `0600` file) — the Keychain
+/// proved unworkable for headless CLI/MCP use, where its GUI access prompt
+/// cannot be answered. This type exists solely for the one-time migration path
+/// (`jointchiefs-keygetter migrate`): it can detect and read legacy items so
+/// they can be moved into the file store, then deleted. Nothing writes the
+/// Keychain anymore.
+public enum LegacyKeychainStore {
 
     static let service = "com.jointchiefs.keygetter"
 
     // MARK: - Public Methods
 
-    /// Stores an API key in the keychain for the given account.
+    /// Prompt-free existence probe for a legacy Keychain item.
     ///
-    /// If an entry already exists, it is deleted and re-created to ensure the
-    /// accessibility class is enforced (SecItemUpdate cannot change it).
+    /// A metadata-only query (`kSecReturnData: false`) does not read the secret
+    /// data, so it never triggers the macOS access prompt. Returns `false` on
+    /// any failure (locked keychain, headless context) — best-effort, used only
+    /// to decide whether to hint the user toward migration.
     ///
-    /// - Parameters:
-    ///   - apiKey: The API key string to store.
-    ///   - account: The provider account identifier (e.g., "openai", "gemini").
-    /// - Throws: `KeychainError.encodingFailed` if the key cannot be encoded,
-    ///           or `KeychainError.unexpectedStatus` for other Keychain failures.
-    public static func store(apiKey: String, for account: String) throws {
-        guard let data = apiKey.data(using: .utf8) else {
-            throw KeychainError.encodingFailed
-        }
-
-        let addQuery: [String: Any] = [
+    /// - Parameter account: The provider account identifier.
+    /// - Returns: `true` if a legacy item exists for this account.
+    public static func exists(for account: String) -> Bool {
+        let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-            kSecValueData as String: data
+            kSecReturnData as String: false,
+            kSecMatchLimit as String: kSecMatchLimitOne
         ]
 
-        // Delete any existing item first — ensures the accessibility class is applied
-        // even to pre-existing items (SecItemUpdate cannot change kSecAttrAccessible).
-        let searchQuery: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-        ]
-        SecItemDelete(searchQuery as CFDictionary)
-
-        let status = SecItemAdd(addQuery as CFDictionary, nil)
-        guard status == errSecSuccess else {
-            throw KeychainError.unexpectedStatus(status)
-        }
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        return status == errSecSuccess
     }
 
-    /// Retrieves an API key from the keychain for the given account.
+    /// Retrieves a legacy API key from the Keychain for the given account.
+    ///
+    /// Reading the secret data can surface the macOS access prompt — this is
+    /// only called from the migration path, which runs while the user is
+    /// present in the setup app.
     ///
     /// - Parameter account: The provider account identifier.
     /// - Returns: The stored API key string.
@@ -60,11 +51,14 @@ public enum KeychainService {
     ///           `KeychainError.encodingFailed` if the stored data cannot be decoded,
     ///           or `KeychainError.unexpectedStatus` for other Keychain failures.
     public static func retrieve(for account: String) throws -> String {
+        // Note: `kSecAttrAccessible` is deliberately absent. In a
+        // `SecItemCopyMatching` query it acts as a match constraint, not an
+        // attribute, and can cause spurious `errSecItemNotFound` against items
+        // written with a different accessibility class.
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
@@ -86,9 +80,10 @@ public enum KeychainService {
         }
     }
 
-    /// Deletes an API key from the keychain for the given account.
+    /// Deletes a legacy API key from the Keychain for the given account.
     ///
-    /// Does not throw if the item does not exist.
+    /// Does not throw if the item does not exist. Called by the migration path
+    /// only after the key has been written to `CredentialStore` and verified.
     ///
     /// - Parameter account: The provider account identifier.
     /// - Throws: `KeychainError.unexpectedStatus` if deletion fails for a reason

@@ -8,7 +8,7 @@ struct KeysView: View {
     var body: some View {
         SetupPage(
             title: "API Keys",
-            subtitle: "Paste the API key for every provider you want on the panel. Keys are saved to the macOS Keychain — the first time you save one, macOS asks for access. Click \"Always Allow\" so the CLI and headless agents can read it later without prompting."
+            subtitle: "Paste the API key for every provider you want on the panel. Keys are saved to a protected file on this Mac (readable only by you), so the CLI and headless agents can read them later without any prompt."
         ) {
             VStack(spacing: AgentSpacing.md) {
                 ForEach(ProviderType.allCases, id: \.self) { provider in

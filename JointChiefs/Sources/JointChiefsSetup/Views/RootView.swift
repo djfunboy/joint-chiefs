@@ -35,13 +35,14 @@ struct RootView: View {
         }
         .background(Color.agentBgDeep)
         .task {
-            // Probe the Keychain and copy CLI binaries into $PATH in parallel —
-            // both are independent and we don't want either blocking the first
-            // paint. Keychain probe may trigger a macOS access prompt; CLI
-            // install is filesystem-only and quick.
-            async let keys: () = model.refreshKeyStatuses()
+            // CLI install is independent and filesystem-only — run it in
+            // parallel. Migration must finish before the key-status probe so
+            // the Keys screen reflects post-migration state, so those two run
+            // in sequence.
             async let cli: () = model.installCLIIfNeeded()
-            _ = await (keys, cli)
+            await model.migrate()
+            await model.refreshKeyStatuses()
+            _ = await cli
         }
     }
 }

@@ -4,17 +4,21 @@ Joint Chiefs is a macOS app that sends source code to external LLM APIs and stor
 
 ## Scope
 
-**In scope.** Anything that could leak API keys, expose submitted code to unintended third parties, allow remote code execution on the user's machine, or let a local attacker without Keychain access read the user's stored keys.
+**In scope.** Anything that could leak API keys, expose submitted code to unintended third parties, allow remote code execution on the user's machine, or let a remote attacker read the user's stored keys.
 
 **Out of scope.** The behavior of the LLM providers themselves (OpenAI, Google, xAI, Anthropic, local Ollama). When you submit code through Joint Chiefs, it is sent to whichever providers you've configured. Their data-handling policies apply from the moment your code leaves your machine. Joint Chiefs does not and cannot guarantee how providers use submitted content.
 
 ## Key storage
 
-API keys are held in the macOS Keychain with `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`. They never get written to plain config files, never get logged, and never leave the machine except as the Authorization header of an HTTPS request to the provider you configured.
+API keys are stored in a permission-locked file: `~/Library/Application Support/Joint Chiefs/credentials.json`, written with mode `0600` (readable and writable only by the owning user) in a directory set to `0700`. Keys are never logged, and never leave the machine except as the Authorization header of an HTTPS request to the provider you configured.
 
-One signed binary — `jointchiefs-keygetter` — is the only process authorized to read or write Joint Chiefs' Keychain items. Every other Joint Chiefs surface (CLI, MCP server, setup app) shells out to it via `Process` and discards the key as soon as the provider call completes. This design was validated empirically in `prototypes/keychain-access/` before the rest of the product was built. The keygetter's code-signing identifier is `com.jointchiefs.keygetter`; the Keychain ACL is pinned to that identifier, so changing it across a release invalidates saved keys. Releases re-sign with a stable Developer ID Application certificate to preserve that ACL across updates.
+This is the standard server-side credential pattern, chosen because Joint Chiefs has to work headless — invoked over SSH or from cron, with no logged-in GUI user. Earlier versions used the macOS Keychain; its access approval is an interactive GUI prompt that a headless session cannot show or answer, so the CLI and MCP server could not read saved keys. A `0600` file has no session or prompt dependency. On a Mac with FileVault enabled — Apple's default on modern hardware — the file is encrypted at rest along with the rest of the disk.
 
-An environment-variable fallback exists (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.) for CI contexts where a Keychain is not available. It takes precedence over the keygetter when set. This path is documented as CI-only in the setup app's first-run disclosure. End users should not set these variables.
+**Honest threat model.** A `0600` file protects the keys from *other* local user accounts and from any remote attacker who cannot already run code as your user. It does *not* protect against an attacker who is already executing as your user account, and on a Mac *without* FileVault it does not protect against someone with physical access to the disk. This is the same exposure as an SSH private key, an AWS credentials file, or a `.npmrc` token — and the same exposure the environment-variable path always had. If you handle keys that warrant stronger isolation, enable FileVault and treat the machine's user account as the trust boundary.
+
+One binary — `jointchiefs-keygetter` — is the only process that reads or writes the credentials file. Every other Joint Chiefs surface (CLI, MCP server, setup app) shells out to it via `Process` and discards the key as soon as the provider call completes, so the file's access path is auditable in exactly one place. Joint Chiefs v0.5.6 and earlier stored keys in the Keychain; on first launch the setup app runs a one-time migration (`jointchiefs-keygetter migrate`) that moves any legacy Keychain keys into the file and removes the Keychain items.
+
+An environment-variable fallback exists (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.) for CI contexts. It takes precedence over the credentials file when set. This path is documented as CI-only in the setup app's first-run disclosure. End users should not set these variables.
 
 ## MCP server
 

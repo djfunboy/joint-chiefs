@@ -1,6 +1,6 @@
 # Joint Chiefs — Known Issues
 
-**Last Updated:** 2026-04-26
+**Last Updated:** 2026-05-17
 
 A running list of known bugs, limitations, and rough edges. PRs that fix any of these are welcome.
 
@@ -18,9 +18,8 @@ All six setup-app view files (`RootView`, `UsageView`, `KeysView`, `RolesWeights
 ## Known Limitations
 
 - **MCP SDK pinned pre-1.0.** `modelcontextprotocol/swift-sdk` is pinned to exact `0.12.0` in `Package.swift`. Review the SDK's release notes before bumping — the protocol and API surface may change across 0.x versions.
-- **Dev-built keygetter uses ad-hoc code signature.** `swift build` produces an ad-hoc-signed `jointchiefs-keygetter`. That identity works for local Keychain access but is *not* the identity that end-user Keychain items are scoped to. Release builds must re-sign with `codesign --sign <Developer ID> --identifier com.jointchiefs.keygetter <path>` — the designated requirement derived from that signature is what `kc-keygetter-prototype` validated as stable across updates.
 - **Keygetter discovery is best-effort.** `APIKeyResolver.locateKeygetter` checks `JOINTCHIEFS_KEYGETTER_PATH`, sibling-of-caller, and `/Applications/Joint Chiefs.app/Contents/Resources/`. If a user installs the app bundle elsewhere, they need to set the env var. Document in SECURITY.md before launch.
-- **Setup app's key-write path isn't end-to-end tested.** `APIKeyResolver.writeViaKeygetter` / `deleteViaKeygetter` were added for the setup app and shell out to the keygetter's `write` / `delete` subcommands (both already covered by the keygetter's exit-code contract). A full round-trip "write from setup app → read from CLI" test requires Keychain access a unit test can't sandbox — tracked as manual QA.
+- **Legacy-Keychain migration isn't end-to-end tested.** `CredentialStore` (the live file store) is covered by unit tests, and the setup app's Save verifies its own write round-trip. But the `keygetter migrate` path reads v0.5.6-era items out of the macOS Keychain — `LegacyKeychainStore.retrieve` can't be sandboxed in a unit test (it needs a real Keychain item and may surface an access prompt). Migration is tracked as manual QA: install v0.5.7 on a machine with v0.5.6 Keychain keys and confirm they land in `credentials.json` with the Keychain items removed.
 - **Convergence detection is title-similarity based.** The adaptive early-break heuristic compares finding titles across rounds. It may stop debate too early when models phrase the same finding differently, or too late when they word the same surface issue identically but disagree on substance.
 
 ## Roadmap-Adjacent
@@ -37,7 +36,8 @@ Manual verification gaps (automated tests cover the unit and orchestrator layers
 
 - [ ] Adaptive early-break behavior with all 6 providers under load.
 - [ ] Hub-and-spoke moderator synthesis quality on large diffs (>1000 lines).
-- [ ] Keychain storage with `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` across reboots.
+- [ ] Headless credential read: `credentials.json` resolves with no logged-in GUI user (SSH / cron / `launchctl asuser`) — the property the v0.5.7 file store exists for.
+- [ ] Legacy-Keychain migration on a real v0.5.6→v0.5.7 upgrade: keys move into `credentials.json`, Keychain items removed, no data loss.
 - [ ] CLI behavior when no API keys are configured (should print a clear error).
 - [ ] CLI behavior when only one provider is configured (should still produce useful output).
 - [ ] VoiceOver nav across the five setup-app views with a live screen reader (tokens + `.isHeader` traits + pill labels + slider labels added; needs smoke test).

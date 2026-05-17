@@ -16,17 +16,17 @@ struct APIKeyResolverTests {
         #expect(ProviderType.ollama.envVarName == "OLLAMA_API_KEY")
     }
 
-    @Test("Ollama has no keychain account (local-only, no credential)")
-    func ollamaNoKeychainAccount() {
-        #expect(ProviderType.ollama.keychainAccount == nil)
+    @Test("Ollama has no credential account (local-only, no credential)")
+    func ollamaNoCredentialAccount() {
+        #expect(ProviderType.ollama.credentialAccount == nil)
     }
 
-    @Test("Remote providers map to stable keychain account names")
-    func keychainAccountNames() {
-        #expect(ProviderType.openAI.keychainAccount == "openai")
-        #expect(ProviderType.anthropic.keychainAccount == "anthropic")
-        #expect(ProviderType.gemini.keychainAccount == "gemini")
-        #expect(ProviderType.grok.keychainAccount == "grok")
+    @Test("Remote providers map to stable credential account names")
+    func credentialAccountNames() {
+        #expect(ProviderType.openAI.credentialAccount == "openai")
+        #expect(ProviderType.anthropic.credentialAccount == "anthropic")
+        #expect(ProviderType.gemini.credentialAccount == "gemini")
+        #expect(ProviderType.grok.credentialAccount == "grok")
     }
 
     // MARK: - Env var precedence
@@ -104,6 +104,25 @@ struct APIKeyResolverTests {
 
         #expect(throws: APIKeyResolverError.self) {
             _ = try APIKeyResolver.resolve(.openAI)
+        }
+    }
+
+    @Test("Keygetter exit 6 (legacy keys) throws legacyKeysNeedMigration")
+    func keygetterLegacyKeysNeedMigration() throws {
+        let fake = try makeFakeKeygetter(exitCode: 6, stderr: "needs migration")
+        defer { try? FileManager.default.removeItem(atPath: fake) }
+
+        unsetenv("OPENAI_API_KEY")
+        setenv("JOINTCHIEFS_KEYGETTER_PATH", fake, 1)
+        defer { unsetenv("JOINTCHIEFS_KEYGETTER_PATH") }
+
+        do {
+            _ = try APIKeyResolver.resolve(.openAI)
+            Issue.record("expected legacyKeysNeedMigration")
+        } catch APIKeyResolverError.legacyKeysNeedMigration {
+            // expected
+        } catch {
+            Issue.record("wrong error type: \(error)")
         }
     }
 

@@ -17,7 +17,7 @@ struct DisclosureView: View {
 
                 disclosureRow(
                     title: "What stays on-device",
-                    body: "API keys live in the macOS Keychain, reachable only via the signed Joint Chiefs key-reader binary. Review transcripts are written to ~/Library/Application Support/Joint Chiefs/ as plain JSON — no cloud sync, no telemetry."
+                    body: "API keys are stored in a permission-locked local file (mode 0600, readable only by your user account), encrypted at rest by FileVault. Review transcripts are written alongside it in ~/Library/Application Support/Joint Chiefs/ as plain JSON — no cloud sync, no telemetry."
                 )
 
                 disclosureRow(

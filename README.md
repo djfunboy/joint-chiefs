@@ -24,7 +24,7 @@ Joint Chiefs ships as three binaries, one engine:
 | `jointchiefs-mcp` | MCP stdio server for any MCP-aware client | Paste the setup app's JSON snippet into your client's MCP config |
 | `jointchiefs-setup` | One-shot SwiftUI installer (macOS) | Handles API key entry, strategy config, installs all three binaries |
 
-A fourth binary, `jointchiefs-keygetter`, is the single signed identity allowed to read/write the Keychain. The CLI and MCP server call it via `Process`.
+A fourth binary, `jointchiefs-keygetter`, is the single binary that reads and writes the local API-key file. The CLI and MCP server call it via `Process`.
 
 ## Requirements
 
@@ -57,9 +57,9 @@ export GROK_API_KEY="..."
 export ANTHROPIC_API_KEY="sk-ant-..."   # also acts as the moderator
 ```
 
-**b) macOS Keychain** (end-user default, via the setup app):
+**b) Local credential file** (end-user default, via the setup app):
 
-Run `jointchiefs-setup`. It walks through disclosure, key entry (with live Test buttons), strategy config, install location, and outputs the MCP config snippet for your AI client.
+Run `jointchiefs-setup`. It walks through disclosure, key entry (with live Test buttons), strategy config, install location, and outputs the MCP config snippet for your AI client. Keys are saved to `~/Library/Application Support/Joint Chiefs/credentials.json` (mode `0600`), so the CLI and headless agents read them with no prompt. Upgrading from v0.5.6 or earlier? The setup app migrates any keys from the old macOS Keychain automatically on first launch.
 
 You only need one key to get started. More keys = more diverse debate.
 
@@ -103,7 +103,7 @@ jointchiefs review src/auth.swift --format json
 
 ## MCP integration
 
-The MCP server (`jointchiefs-mcp`) works with any MCP-aware client. The setup app's **MCP Config** tab emits a ready-to-paste `mcpServers` JSON snippet keyed at the installed binary path. No keys live in the snippet — Joint Chiefs resolves them from the Keychain at tool-call time.
+The MCP server (`jointchiefs-mcp`) works with any MCP-aware client. The setup app's **MCP Config** tab emits a ready-to-paste `mcpServers` JSON snippet keyed at the installed binary path. No keys live in the snippet — Joint Chiefs resolves them from the local credential file at tool-call time.
 
 Minimal snippet shape:
 
@@ -180,7 +180,7 @@ CLI flags:
 
 ## Privacy
 
-- API keys live in the macOS Keychain, reachable only via the signed `jointchiefs-keygetter` binary. Env vars exist as a CI fallback.
+- API keys live in a permission-locked local file (`~/Library/Application Support/Joint Chiefs/credentials.json`, mode `0600`), encrypted at rest by FileVault and read only via the `jointchiefs-keygetter` binary. Env vars exist as a CI fallback.
 - No telemetry. No analytics. The only network traffic is to the LLM APIs you've configured.
 - The MCP server is **stdio-only** — nothing binds a port.
 - Code sent for review is stored only in local transcript files. Delete them whenever.
@@ -189,7 +189,7 @@ CLI flags:
 
 ```bash
 cd JointChiefs
-swift test          # 81 tests
+swift test          # 87 tests
 swift build -c release
 ```
 
@@ -203,7 +203,7 @@ JointChiefs/
 │   ├── JointChiefsCLI/         # jointchiefs executable
 │   ├── JointChiefsMCP/         # jointchiefs-mcp stdio server
 │   ├── JointChiefsSetup/       # jointchiefs-setup SwiftUI installer
-│   └── JointChiefsKeygetter/   # jointchiefs-keygetter — sole Keychain identity
+│   └── JointChiefsKeygetter/   # jointchiefs-keygetter — sole credential-file accessor
 └── Tests/JointChiefsCoreTests/
 ```
 

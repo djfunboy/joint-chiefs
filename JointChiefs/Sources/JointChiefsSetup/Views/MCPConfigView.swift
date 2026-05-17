@@ -230,7 +230,7 @@ struct MCPConfigView: View {
                 .accessibilityLabel(copiedJSON ? "Copied" : "Copy JSON config")
             }
 
-            Text("If you'd rather edit the config file directly, here's the JSON block to add under `mcpServers`. No API keys in here — Joint Chiefs pulls them from the Keychain at request time.")
+            Text("If you'd rather edit the config file directly, here's the JSON block to add under `mcpServers`. No API keys in here — Joint Chiefs pulls them from its local credential file at request time.")
                 .font(.agentSmall)
                 .foregroundStyle(Color.agentTextBody)
                 .fixedSize(horizontal: false, vertical: true)
@@ -320,7 +320,7 @@ struct MCPConfigView: View {
         Do this:
 
         1. Find your own MCP config file. The JSON path depends on which AI assistant you are — figure out your own path; don't ask me.
-        2. Add a new entry under "mcpServers" named "joint-chiefs" pointing at that command. No API keys go in here — Joint Chiefs reads them from the macOS Keychain at request time.
+        2. Add a new entry under "mcpServers" named "joint-chiefs" pointing at that command. No API keys go in here — Joint Chiefs reads them from its local credential file at request time.
         3. Show me the exact entry you wrote so I can verify it landed.
         4. Tell me whether anything (you, the host app, etc.) needs to restart for the new server to load. If it does, walk me through the restart.
         5. After the restart, confirm you can see the `joint_chiefs_review` tool in your tool list. Then call it on a tiny snippet (5–10 lines of any code is fine) and show me the consensus output as proof it's wired end-to-end.
