@@ -18,6 +18,15 @@ the next round, and — once consensus is reached or max rounds hit — writes
 the final summary. A code-based `ConsensusBuilder` is available as a
 fallback if the moderator is unavailable.
 
+Every review/debate/moderator prompt is centralized in `ReviewPrompts.swift`
+and hard-codes an **anti-over-engineering calibration** posture. A hub-and-spoke
+debate naturally escalates "thoroughness" — each round a model justifies its
+turn by finding more, so output drifts toward nitpicks and speculative
+over-engineering. The prompts counter this with an explicit proportionality bar
+(what clears the bar for a finding, honest severity definitions), a debate
+framed as *converge-and-cut* rather than accumulate, and a moderator instructed
+to cut anything not worth acting on before shipping.
+
 ```
 ┌──────────────────────────┐
 │     jointchiefs CLI      │
@@ -97,6 +106,7 @@ JointChiefs/
 │   │       ├── ProviderFactory.swift        (panel assembly; filters `weight == 0`; moderator/tiebreaker builders)
 │   │       ├── ConsensusBuilder.swift
 │   │       ├── DebateOrchestrator.swift
+│   │       ├── ReviewPrompts.swift          (single source of truth for review/debate/moderator prompts + calibration)
 │   │       └── Providers/  (OpenAI, Anthropic, Gemini, Grok, Ollama, OpenAICompatible — each exposes providerType)
 │   ├── JointChiefsCLI/                       (executable: jointchiefs)
 │   ├── JointChiefsMCP/                       (executable: jointchiefs-mcp — stdio only)

@@ -37,18 +37,7 @@ public struct OpenAIProvider: ReviewProvider {
     // MARK: - ReviewProvider
 
     public func review(code: String, context: ReviewContext) async throws -> ProviderReview {
-        let systemPrompt = """
-            You are a senior code reviewer. Analyze the provided code and return a JSON object with:
-            - "summary": a brief overall assessment of the code quality
-            - "findings": an array of issues found, where each finding has:
-              - "title": short description of the issue
-              - "description": detailed explanation
-              - "severity": one of "critical", "high", "medium", "low"
-              - "recommendation": how to fix the issue
-              - "location": where in the code the issue occurs (function name, line range, or section)
-
-            Return ONLY valid JSON. No markdown, no code fences.
-            """
+        let systemPrompt = ReviewPrompts.reviewSystem
 
         var userMessage = "Review the following code:\n\n```\n\(code)\n```"
         if let goal = context.goal {
@@ -68,34 +57,7 @@ public struct OpenAIProvider: ReviewProvider {
     }
 
     public func debate(code: String, priorFindings: [Finding], round: Int) async throws -> ProviderReview {
-        let findingsText = priorFindings.map { finding in
-            "- [\(finding.severity.rawValue.uppercased())] \(finding.title): \(finding.description) (Location: \(finding.location))"
-        }.joined(separator: "\n")
-
-        let systemPrompt = """
-            You are a senior code reviewer in debate round \(round). Other reviewers have produced the findings below.
-
-            Prior findings:
-            \(findingsText)
-
-            You MUST directly address each prior finding by title. For each one:
-            - AGREE and state why if you believe it is correct and properly rated
-            - CHALLENGE and explain your reasoning if you believe it is wrong, overstated, or misrated in severity
-            - REVISE with your corrected version if it is partially correct
-
-            Then, if you have NEW findings not yet raised, add them.
-
-            Do NOT simply restate prior findings. Take a clear position on each one. If you previously raised \
-            a finding that others challenged, either defend your position with specific reasoning or concede.
-
-            Return a JSON object with:
-            - "summary": your assessment after considering all prior findings and challenges
-            - "findings": your complete final list of findings after this round of debate
-              Each finding has: "title", "description", "severity" (critical/high/medium/low), \
-            "recommendation", "location"
-
-            Return ONLY valid JSON. No markdown, no code fences.
-            """
+        let systemPrompt = ReviewPrompts.debateSystem(round: round, priorFindings: priorFindings)
 
         let userMessage = "Code under review:\n\n```\n\(code)\n```\n\nRespond with your positions on each finding above."
 

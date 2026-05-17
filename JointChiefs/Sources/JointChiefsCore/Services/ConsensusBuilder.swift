@@ -110,8 +110,8 @@ public enum ConsensusBuilder {
         let context = ReviewContext(
             code: debateSummary,
             filePath: transcript.filePath,
-            goal: "Synthesize the consensus from this multi-model code review debate. You are the deciding judge. Read all rounds, resolve disagreements, deduplicate similar findings, and produce the final ranked list. If models disagreed on severity, use your judgment. If a model made a case for downgrading a finding and the argument is sound, respect it. Only include findings that survived the debate.",
-            context: "You are the consensus builder for a panel of AI code reviewers. Return your final findings as JSON."
+            goal: ReviewPrompts.finalConsensusGoal,
+            context: ReviewPrompts.finalConsensusContext
         )
 
         let review = try await decidingModel.review(code: context.code, context: context)
@@ -197,13 +197,7 @@ public enum ConsensusBuilder {
         let context = ReviewContext(
             code: findingsJSON,
             filePath: nil,
-            goal: """
-                You are moderating a code review debate. Multiple reviewers have submitted findings. \
-                Deduplicate similar findings, resolve conflicting severities by picking the most justified level, \
-                and produce a clean consolidated list. Keep it concise — max 15 findings. \
-                Drop trivial or redundant items. Preserve the strongest version of each unique finding. \
-                The original review goal was: \(goal)
-                """,
+            goal: ReviewPrompts.betweenRoundSynthesisGoal(goal: goal),
             context: nil
         )
 
