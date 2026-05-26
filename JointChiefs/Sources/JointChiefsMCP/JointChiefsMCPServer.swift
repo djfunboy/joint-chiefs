@@ -14,7 +14,7 @@ struct JointChiefsMCPServer {
     static func main() async throws {
         let server = Server(
             name: "joint-chiefs",
-            version: "0.5.0",
+            version: "0.5.9",
             capabilities: .init(
                 tools: .init(listChanged: false)
             )

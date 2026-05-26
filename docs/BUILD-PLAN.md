@@ -5,8 +5,8 @@
 
 ## What's Built
 
-Joint Chiefs has matured from "solo-use CLI" into a three-surface product in
-progress: CLI, stdio MCP server, and (still to come) a setup app.
+Joint Chiefs has matured from "solo-use CLI" into a four-surface product:
+CLI, stdio MCP server, setup app, and credential-file keygetter.
 
 - **CLI** (`jointchiefs`) — streaming multi-model review, same UX as v1
 - **MCP server** (`jointchiefs-mcp`) — stdio-only; initialize + tools/list smoke-tested
@@ -21,8 +21,8 @@ progress: CLI, stdio MCP server, and (still to come) a setup app.
 - **Per-provider model override:** `StrategyConfig.providerModels` lets users pick from `ProviderType.availableModels` (curated top 5 per provider) — resolution priority `providerModels[type]` > env var > `ProviderType.defaultModel`
 - **Setup app:** `jointchiefs-setup` SwiftUI executable shipping its full five-section installer — Usage / Keys / Roles & Weights / MCP Config / Privacy. All views use Agentdeck tokens (`agentBgPanel`, `AgentInputStyle`, `AgentPill`, `AgentChip`, `agentPanel`, `.agentPrimary` / `.agentSecondary` / `.agentDanger` button styles). CLI binaries install silently into `/opt/homebrew/bin` (or `~/.local/bin` fallback) on first launch — no manual destination picker.
 - **Website live at [jointchiefs.ai](https://jointchiefs.ai/)** — static site deployed via Netlify with auto-deploy on push to main. Source in the private `djfunboy/joint-chiefs-website` repo. Custom domain + Let's Encrypt cert configured.
-- **Fourteen releases shipped:** v0.1.0 → v0.2.0 → v0.3.0 → v0.3.1 → v0.4.0 → v0.5.0 → v0.5.1 (docs-only) → v0.5.2 (Sparkle build-number hotfix) → v0.5.3 (curated model-list refresh — GPT-5.5, Claude Opus 4.7, Grok 4.20 reasoning) → v0.5.4 (OpenAI-compat dropdown UX + Gemini list refresh) → v0.5.5 (filter non-chat models from the OpenAI-compat dropdown) → v0.5.6 (critical OpenAI `temperature` fix + full model-list refresh + MCP progress side-channels + in-context Keychain prompt) → v0.5.7 (API keys moved off the macOS Keychain into a `0600` `credentials.json` file so the CLI/MCP work headless; one-time legacy-Keychain migration) → v0.5.8 (hard-coded anti-over-engineering calibration in the centralized `ReviewPrompts`). Notarized + stapled DMGs through v0.5.8; Sparkle appcast carries v0.5.0 + v0.5.2 + v0.5.3 + v0.5.4 + v0.5.5 + v0.5.6 + v0.5.7 + v0.5.8 (pre-v0.5.0 entries removed after the build-number bug — see `tasks/lessons.md` 2026-04-26). Homebrew cask SHA wired to v0.5.8.
-- **92 tests passing** (unit + orchestrator integration + consensus-mode coverage + weighted-voting + CredentialStore file-store coverage + ReviewPrompts calibration coverage + APIKeyResolver with fake-keygetter harness)
+- **Fifteen releases shipped:** v0.1.0 → v0.2.0 → v0.3.0 → v0.3.1 → v0.4.0 → v0.5.0 → v0.5.1 (docs-only) → v0.5.2 (Sparkle build-number hotfix) → v0.5.3 (curated model-list refresh — GPT-5.5, Claude Opus 4.7, Grok 4.20 reasoning) → v0.5.4 (OpenAI-compat dropdown UX + Gemini list refresh) → v0.5.5 (filter non-chat models from the OpenAI-compat dropdown) → v0.5.6 (critical OpenAI `temperature` fix + full model-list refresh + MCP progress side-channels + in-context Keychain prompt) → v0.5.7 (API keys moved off the macOS Keychain into a `0600` `credentials.json` file so the CLI/MCP work headless; one-time legacy-Keychain migration) → v0.5.8 (hard-coded anti-over-engineering calibration in the centralized `ReviewPrompts`) → v0.5.9 (Gemini default refresh to `gemini-3.5-flash`). Notarized + stapled DMGs through v0.5.9; Sparkle appcast carries v0.5.0 + v0.5.2 + v0.5.3 + v0.5.4 + v0.5.5 + v0.5.6 + v0.5.7 + v0.5.8 + v0.5.9 (pre-v0.5.0 entries removed after the build-number bug — see `tasks/lessons.md` 2026-04-26). Homebrew cask SHA wired to v0.5.9.
+- **90+ tests passing** (unit + orchestrator integration + consensus-mode coverage + weighted-voting + CredentialStore file-store coverage + ReviewPrompts calibration coverage + APIKeyResolver with fake-keygetter harness; exact count changes over time)
 
 Phases 1–3, 5, 8, and 10 are complete. Phase 6 (setup app) ships its full
 five-view installer with the v0.5.0 "Configured AI tools" panel surfacing
@@ -236,7 +236,7 @@ flat-sibling when it runs from `.build/release/` during development.
 **Goal:** Production-ready quality.
 
 **Steps:**
-1. ✅ Orchestrator integration tests with mock providers (92 tests passing — includes per-consensus-mode coverage, tiebreaker routing, weighted voting, `providerWeights` JSON round-trip, APIKeyResolver fake-keygetter harness, CredentialStore file store, and ReviewPrompts calibration)
+1. ✅ Orchestrator integration tests with mock providers (90+ tests passing — includes per-consensus-mode coverage, tiebreaker routing, weighted voting, `providerWeights` JSON round-trip, APIKeyResolver fake-keygetter harness, CredentialStore file store, and ReviewPrompts calibration; `swift test` is authoritative for the current count)
 2. ✅ Error handling audit for provider failure paths
 3. ✅ APIKeyResolver env/keygetter precedence covered with fake-keygetter harness
 4. [ ] Accessibility pass — VoiceOver/Dynamic Type on the setup app
@@ -244,7 +244,7 @@ flat-sibling when it runs from `.build/release/` during development.
 6. ✅ Documentation: README restructured for four-surface product (CLI, MCP, setup, keygetter); CLAUDE.md + all docs/*.md synced 2026-04-25
 
 **Checkpoint:**
-- [x] All tests pass (81 passing)
+- [x] All tests pass (`swift test` is authoritative for the current count)
 - [x] Zero warnings in build
 - [ ] VoiceOver works on all interactive elements — with Phase 6
 - [ ] Idle memory profiled
@@ -298,3 +298,4 @@ reversed in favor of the standard Apple Developer flow.
 | 1.7 | 2026-04-26 | Reconciled v0.4.0 + v0.3.0 + remaining v0.5.0 changes that drifted from "What's Built" and Phase 6. Bumped provider count 5 → 6 (added `OpenAICompatibleProvider` for LM Studio / Jan / llama.cpp-server / Msty / LocalAI; v0.4.0). Added `providerModels` per-provider model override (v0.3.0). Phase 6 header flipped from "🟢 SCAFFOLD + DESIGN-SYSTEM MIGRATION COMPLETE" → "🟢 COMPLETE." Phase 6 step 7 rewritten — the Install pane was replaced by silent auto-install on first launch (v0.3.0); UsageView is the new first screen. Phase 6 step 13 added: sidebar update-status footer (v0.5.0). Phase 2 step 5 added: `OpenAICompatibleProvider`. Six-release log added to "What's Built" (v0.1.0 → v0.5.0). Pre-flight moderator-key validation flagged as the remaining UX gap under Phase 9. |
 | 1.8 | 2026-05-17 | v0.5.7 — API keys moved off the macOS Keychain into a `0600` `credentials.json` file (`CredentialStore`) so the CLI and MCP server work headless; the Keychain's GUI access prompt can't be answered over SSH/cron. `KeychainService` → `LegacyKeychainStore` (read-only, migration path); `keygetter migrate` subcommand carries v0.5.6 keys forward. Release log updated to thirteen releases; test count 81 → 87 (CredentialStore coverage). Stale "Keychain" references reconciled across "What's Built", Phase 6, and Phase 9. |
 | 1.9 | 2026-05-17 | v0.5.8 — hard-coded anti-over-engineering calibration in the review prompts. All review/debate/moderator prompts centralized into a new `ReviewPrompts` enum (were byte-identical copy-paste across 5 provider files); each now carries a proportionality bar, a converge-and-cut debate framing, and a moderator cut-instruction (cap 15 → 10). Release log updated to fourteen releases; test count 87 → 92 (`ReviewPromptsTests`). |
+| 1.10 | 2026-05-26 | v0.5.9 — Gemini default model refreshed to `gemini-3.5-flash`; picker-order tests now assert curated provider lists start with each provider's default. Release log updated to fifteen releases. |

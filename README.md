@@ -155,7 +155,7 @@ Full details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 | `OPENAI_API_KEY` | OpenAI authentication | (required to enable OpenAI) |
 | `OPENAI_MODEL` | OpenAI model override | `gpt-5.5` |
 | `GEMINI_API_KEY` | Google Gemini authentication | (required to enable Gemini) |
-| `GEMINI_MODEL` | Gemini model override | `gemini-3.1-pro-preview` |
+| `GEMINI_MODEL` | Gemini model override | `gemini-3.5-flash` |
 | `GROK_API_KEY` | xAI Grok authentication | (required to enable Grok) |
 | `GROK_MODEL` | Grok model override | `grok-4.3` |
 | `ANTHROPIC_API_KEY` | Anthropic — also serves as moderator | (required to enable Claude) |
@@ -189,7 +189,7 @@ CLI flags:
 
 ```bash
 cd JointChiefs
-swift test          # 92 tests
+swift test          # current test count changes over time
 swift build -c release
 ```
 

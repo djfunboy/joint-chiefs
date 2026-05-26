@@ -48,9 +48,16 @@ struct ModelTests {
     func providerTypeDefaultModels() {
         #expect(ProviderType.openAI.defaultModel == "gpt-5.5")
         #expect(ProviderType.anthropic.defaultModel == "claude-opus-4-7")
-        #expect(ProviderType.gemini.defaultModel == "gemini-3.1-pro-preview")
+        #expect(ProviderType.gemini.defaultModel == "gemini-3.5-flash")
         #expect(ProviderType.grok.defaultModel == "grok-4.3")
         #expect(ProviderType.ollama.defaultModel == "llama3")
+    }
+
+    @Test("Curated model pickers start with each provider default")
+    func availableModelsStartWithDefault() {
+        for provider in ProviderType.allCases where !provider.availableModels.isEmpty {
+            #expect(provider.availableModels.first == provider.defaultModel)
+        }
     }
 
     // MARK: - ReviewContext

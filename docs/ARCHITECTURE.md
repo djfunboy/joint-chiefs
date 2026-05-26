@@ -129,6 +129,7 @@ JointChiefs/
 protocol ReviewProvider: Sendable {
     var name: String { get }
     var model: String { get }
+    var providerType: ProviderType { get }
     func review(code: String, context: ReviewContext) async throws -> ProviderReview
     func debate(code: String, priorFindings: [Finding], round: Int) async throws -> ProviderReview
     func testConnection() async throws -> Bool
@@ -394,7 +395,7 @@ for enum-keyed dictionaries. See the custom `init(from:)` / `encode(to:)` in
 | `OPENAI_API_KEY` | OpenAI authentication | (required to enable OpenAI) |
 | `OPENAI_MODEL` | OpenAI model override | `gpt-5.5` |
 | `GEMINI_API_KEY` | Google Gemini authentication | (required to enable Gemini) |
-| `GEMINI_MODEL` | Gemini model override | `gemini-3.1-pro-preview` |
+| `GEMINI_MODEL` | Gemini model override | `gemini-3.5-flash` |
 | `GROK_API_KEY` | xAI Grok authentication | (required to enable Grok) |
 | `GROK_MODEL` | Grok model override | `grok-4.3` |
 | `ANTHROPIC_API_KEY` | Anthropic authentication — also serves as deciding model | (required to enable Claude) |
@@ -466,8 +467,8 @@ look indistinguishable from a hang.
 
 - **App repo:** public at [github.com/djfunboy/joint-chiefs](https://github.com/djfunboy/joint-chiefs) — MIT licensed.
 - **Website:** [jointchiefs.ai](https://jointchiefs.ai/) — static HTML + shared `styles.css`, Agentdeck palette matching the setup app. Hosted on Netlify; source is a separate private repo (`djfunboy/joint-chiefs-website`) with auto-deploy on push to main. Netlify manages the apex domain + `www` alias + Let's Encrypt cert.
-- **Release artifact:** notarized + stapled DMG containing `Joint Chiefs.app` with the four binaries in `Contents/Resources/` (CLI/MCP/keygetter) and `Contents/MacOS/jointchiefs-setup`. Shipped through v0.5.6; SHA-256 wired into `Casks/joint-chiefs.rb`.
-- **Sparkle appcast** at [jointchiefs.ai/appcast.xml](https://jointchiefs.ai/appcast.xml) — EdDSA-signed entries for v0.5.0, v0.5.2, v0.5.3, v0.5.4, v0.5.5, and v0.5.6. Pre-v0.5.0 entries were stripped after the v0.5.0 build-number bug (see `tasks/lessons.md` 2026-04-26 — they used Unix-timestamp `CFBundleVersion` values that exceeded v0.5.0's sequential `5`, causing Sparkle to "downgrade" fresh installs).
+- **Release artifact:** notarized + stapled DMG containing `Joint Chiefs.app` with the four binaries in `Contents/Resources/` (CLI/MCP/keygetter) and `Contents/MacOS/jointchiefs-setup`. Shipped through v0.5.9; SHA-256 wired into `Casks/joint-chiefs.rb`.
+- **Sparkle appcast** at [jointchiefs.ai/appcast.xml](https://jointchiefs.ai/appcast.xml) — EdDSA-signed entries for v0.5.0, v0.5.2, v0.5.3, v0.5.4, v0.5.5, v0.5.6, v0.5.7, v0.5.8, and v0.5.9. Pre-v0.5.0 entries were stripped after the v0.5.0 build-number bug (see `tasks/lessons.md` 2026-04-26 — they used Unix-timestamp `CFBundleVersion` values that exceeded v0.5.0's sequential `5`, causing Sparkle to "downgrade" fresh installs).
 - **Auto-update path:** Sparkle for the app bundle. The `UpdaterService` wrapper drives the sidebar update-status footer. No custom updater for the CLI or MCP binaries — Sparkle replaces the bundle and the bundled binaries get re-installed via `SetupModel.installCLIIfNeeded()` on next launch. A fresh `brew install --cask joint-chiefs` (homebrew tap pending) achieves the same.
 - **Build scripts:** `scripts/build-app.sh` (Release build + bundle assembly + Sparkle.framework copy + `install_name_tool` rpath patch + Developer ID signing), `scripts/build-dmg.sh` (DMG creation + notarization submit + staple), `scripts/generate-icon.sh` (icon `.icns` from PDF source).
 

@@ -28,7 +28,6 @@ These were raised by Joint Chiefs reviewing its own source and remain open:
 
 - Provider attribution can be lost in the non-streaming error path.
 - Logger subsystem is hardcoded, which limits reuse if `JointChiefsCore` is embedded in another app.
-- `ReviewProvider` existential is passed across `TaskGroup` boundaries without explicit `Sendable` annotation.
 
 ## QA Areas Needing More Coverage
 

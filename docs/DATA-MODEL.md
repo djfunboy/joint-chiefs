@@ -262,7 +262,7 @@ public enum ProviderType: String, Codable, CaseIterable, Sendable {
         switch self {
         case .openAI: "gpt-5.5"
         case .anthropic: "claude-opus-4-7"
-        case .gemini: "gemini-3.1-pro-preview"
+        case .gemini: "gemini-3.5-flash"
         case .grok: "grok-4.3"           // ← now active
         case .ollama: "llama3"
         case .openAICompatible: ""

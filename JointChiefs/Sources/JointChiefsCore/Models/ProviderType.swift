@@ -18,7 +18,7 @@ public enum ProviderType: String, Codable, CaseIterable, Sendable {
         switch self {
         case .openAI: "gpt-5.5"
         case .anthropic: "claude-opus-4-7"
-        case .gemini: "gemini-3.1-pro-preview"
+        case .gemini: "gemini-3.5-flash"
         case .grok: "grok-4.3"
         case .ollama: "llama3"
         case .openAICompatible: ""
@@ -53,10 +53,10 @@ public enum ProviderType: String, Codable, CaseIterable, Sendable {
             ]
         case .gemini:
             return [
-                "gemini-3.1-pro-preview",      // flagship (default)
+                "gemini-3.5-flash",            // latest agentic/coding default
+                "gemini-3.1-pro-preview",      // prior flagship
                 "gemini-3-pro-preview",        // prior 3.x flagship
                 "gemini-2.5-pro",              // prior-gen flagship
-                "gemini-3-flash-preview",      // fast 3.x flash
                 "gemini-3.1-flash-lite"        // fast / cheap (GA)
             ]
         case .grok:

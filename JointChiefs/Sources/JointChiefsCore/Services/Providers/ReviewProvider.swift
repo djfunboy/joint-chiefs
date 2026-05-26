@@ -5,7 +5,7 @@ public protocol ReviewProvider: Sendable {
     /// The display name of the provider (e.g., "OpenAI", "Gemini").
     var name: String { get }
 
-    /// The specific model identifier used by this provider (e.g., "gpt-5.4", "gemini-3.1-pro-preview").
+    /// The specific model identifier used by this provider (e.g., "gpt-5.5", "gemini-3.5-flash").
     var model: String { get }
 
     /// The underlying provider type. Used by the orchestrator to look up per-provider

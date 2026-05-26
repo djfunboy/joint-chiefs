@@ -18,12 +18,12 @@ public struct GeminiProvider: ReviewProvider {
     ///
     /// - Parameters:
     ///   - apiKey: The Google AI API key used for authentication (passed as query parameter).
-    ///   - model: The model identifier to use. Defaults to `"gemini-3.1-pro-preview"`.
+    ///   - model: The model identifier to use. Defaults to `"gemini-3.5-flash"`.
     ///   - endpoint: The base URL for the Gemini API. Defaults to `https://generativelanguage.googleapis.com/v1beta`.
     ///   - urlSession: The URL session to use for requests. Defaults to `.shared`.
     public init(
         apiKey: String,
-        model: String = "gemini-3.1-pro-preview",
+        model: String = "gemini-3.5-flash",
         endpoint: URL = URL(string: "https://generativelanguage.googleapis.com/v1beta")!,
         urlSession: URLSession = .shared
     ) {

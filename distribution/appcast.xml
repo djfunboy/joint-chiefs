@@ -9,7 +9,7 @@
     placeholder field, and push the updated file to the joint-chiefs-website
     repo so Netlify re-deploys it. Sparkle verifies the EdDSA signature before
     installing — generate it with `sign_update /path/to/Joint-Chiefs.dmg`
-    (ships with the Sparkle framework / `brew install --cask sparkle`) using
+    (ships with the Sparkle framework, or install Sparkle via Homebrew) using
     the private key stored in your keychain under `https://sparkle-project.org`.
 -->
 <rss version="2.0"
@@ -44,6 +44,26 @@
                 sparkle:edSignature="{{EDDSA_SIGNATURE}}"/>
         </item>
         -->
+
+        <item>
+            <title>Version 0.5.9</title>
+            <pubDate>Tue, 26 May 2026 21:37:16 +0000</pubDate>
+            <sparkle:version>1777000007</sparkle:version>
+            <sparkle:shortVersionString>0.5.9</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[
+                <h2>What's new</h2>
+                <ul>
+                    <li>Gemini now defaults to <code>gemini-3.5-flash</code>.</li>
+                    <li>The setup app's curated Gemini picker starts with the new default, with tests covering the picker-order invariant.</li>
+                </ul>
+            ]]></description>
+            <enclosure
+                url="https://github.com/djfunboy/joint-chiefs/releases/download/v0.5.9/Joint-Chiefs.dmg"
+                length="5995275"
+                type="application/octet-stream"
+                sparkle:edSignature="4mIowQc3iY6v2Jqj3BHxxsphOTUEgCfcp8ehGohpiNXZP29yPrVe01QHDDh6JwSNtLFwNJAinc5M7UotC7sIBQ=="/>
+        </item>
 
     </channel>
 </rss>

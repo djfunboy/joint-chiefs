@@ -6,12 +6,12 @@
 Multi-model AI code review orchestrator. Four surfaces — CLI, stdio MCP server, macOS setup app, and a single credential-file-access binary — all built from one `JointChiefsCore` engine. Sends code to multiple LLMs, runs a structured hub-and-spoke debate with Claude as moderator/decider, and streams a consensus summary back. Grounded in Multi-Agent Debate (MAD) research showing debate improves factuality and reasoning over single-model output.
 
 **Website:** https://jointchiefs.ai/ (live — source in the private `djfunboy/joint-chiefs-website` repo; this repo is the app)
-**Latest release:** v0.5.8 — hard-coded anti-over-engineering calibration in the review prompts. A hub-and-spoke debate escalates "thoroughness" — each round a model justifies its turn by finding more, so output drifted toward nitpicks, speculative edge cases, and over-engineering suggestions, with no calibration anywhere in the prompt chain. All review/debate/moderator prompts are now centralized in `ReviewPrompts.swift` (they were byte-identical copy-paste across 5 provider files) and carry a proportionality posture: a finding must clear a real bar (correctness, security, maintainability that will bite, or the stated goal); debate rounds are reframed converge-and-cut rather than accumulate; the moderator cuts anything not worth shipping over (cap 15 → 10). The moderator inherits `reviewSystem`, so it is calibrated twice. `OpenAICompatibleProvider` is a decorator and was untouched. 92 tests. CFBundleVersion `1777000006`. Builds on v0.5.7.
+**Latest release:** v0.5.9 — Gemini default model refresh. Gemini now defaults to `gemini-3.5-flash`, the setup app's curated Gemini picker starts with that model, and docs/tests were updated so the picker-order invariant stays covered. 90+ tests. CFBundleVersion `1777000007`. Builds on v0.5.8.
 **Next session:** start by reading the most recent `tasks/SESSION-HANDOFF-*.md` (gitignored; local-only).
 
 ## Current State
 
-- **Phases 1–3, 5, 8, and 10 complete.** Phase 6 (setup app) ships its full five-view installer with the v0.5.0 "Configured AI tools" panel showing per-tool MCP wire-up status; remaining items are accessibility (VoiceOver / Dynamic Type) and a v0.5.6→v0.5.7 Keychain-migration round-trip test, both tracked under Phase 9. Website live at jointchiefs.ai with notarized DMGs + Sparkle appcast through v0.5.7.
+- **Phases 1–3, 5, 8, and 10 complete.** Phase 6 (setup app) ships its full five-view installer with the v0.5.0 "Configured AI tools" panel showing per-tool MCP wire-up status; remaining items are accessibility (VoiceOver / Dynamic Type) and a v0.5.6→v0.5.7 Keychain-migration round-trip test, both tracked under Phase 9. Website live at jointchiefs.ai with notarized DMGs + Sparkle appcast through v0.5.9.
 - **CLI installed** at `/opt/homebrew/bin/jointchiefs` (Apple Silicon only). Calls the orchestrator directly — no local HTTP server.
 - **MCP server** at `jointchiefs-mcp` — stdio-only, wraps the orchestrator via `modelcontextprotocol/swift-sdk` pinned exact 0.12.0. Spawned by any MCP-aware client via JSON-RPC over stdio.
 - **Setup app** at `jointchiefs-setup` — one-shot SwiftUI installer (Usage / Keys / Roles & Weights / MCP Config / Privacy). All five views use Agentdeck tokens end-to-end. CLI binaries install silently on first launch — no manual destination picker. Credential-file access goes through the keygetter only; the app runs a one-time legacy-Keychain migration at launch.
@@ -19,7 +19,7 @@ Multi-model AI code review orchestrator. Four surfaces — CLI, stdio MCP server
 - **6 providers working:** OpenAI, Anthropic Claude, Gemini, Grok, plus two local options — Ollama (native protocol) and any OpenAI-compatible server (LM Studio, Jan, llama.cpp-server, Msty, LocalAI). Local options are independent — both can run side by side.
 - **Streaming SSE** on every provider — tokens appear live as each model speaks.
 - **Hub-and-spoke debate:** spokes produce findings; the moderator (Claude by default) synthesizes rounds and writes the final anonymous consensus. 4 consensus modes: `moderatorDecides`, `strictMajority`, `bestOfAll`, `votingThreshold` (with per-provider weighting).
-- **92 tests passing.** No performance profiling done yet.
+- **90+ tests passing**; exact count changes over time, and `swift test` is authoritative. No performance profiling done yet.
 
 ## Key Rules
 
@@ -64,7 +64,7 @@ Optional model overrides (env vars): `OPENAI_MODEL`, `GEMINI_MODEL`, `GROK_MODEL
 
 Strategy (moderator / tiebreaker / consensus mode / rounds / timeout / per-provider weights) is persisted as `StrategyConfig` — see `docs/DATA-MODEL.md`.
 
-**Default models:** `gpt-5.5`, `gemini-3.1-pro-preview`, `grok-4.3`, `claude-opus-4-7`
+**Default models:** `gpt-5.5`, `gemini-3.5-flash`, `grok-4.3`, `claude-opus-4-7`
 **Default debate settings:** 5 rounds with adaptive early break, 120s per-request timeout
 
 ### Local API Keys (dev only)
@@ -87,7 +87,7 @@ Joint Chiefs/                          (github.com/djfunboy/joint-chiefs — pub
 │   │   ├── JointChiefsSetup/          ← jointchiefs-setup SwiftUI executable
 │   │   │   └── DesignSystem/          ← Agentdeck tokens + components (mandatory)
 │   │   └── JointChiefsKeygetter/      ← jointchiefs-keygetter executable
-│   └── Tests/JointChiefsCoreTests/    ← 60 tests
+│   └── Tests/JointChiefsCoreTests/    ← 90+ tests; run `swift test` for the current count
 ├── docs/                              ← see Project Docs below
 ├── prototypes/keychain-access/        ← empirical validation of the keygetter design
 ├── scripts/                           ← build-app.sh + Info.plist template

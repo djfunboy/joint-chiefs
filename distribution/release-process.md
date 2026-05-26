@@ -28,7 +28,7 @@ The signed-and-notarized macOS release flow, end to end.
 
 ### 1. Version
 Pick `vX.Y.Z` and a `CFBundleVersion` that is a monotonic integer **strictly
-greater** than the last release (v0.5.6 = `1777000004`; increment by 1). Bump it
+greater** than the last release (v0.5.9 = `1777000007`; increment by 1). Bump it
 in `CLAUDE.md` (Latest release line), `Casks/joint-chiefs.rb` (`version`),
 `docs/BUILD-PLAN.md` (release log), and any other version-tagged docs.
 
