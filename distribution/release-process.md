@@ -4,8 +4,6 @@ The signed-and-notarized macOS release flow, end to end.
 
 > **Important:** `scripts/build-app.sh` only *assembles* the bundle — it does
 > **not** codesign or notarize. Those steps are manual and are documented here.
-> (Older copy in `BUILD-PLAN.md` / `ARCHITECTURE.md` that says build-app.sh
-> signs is stale.)
 
 ## One-time setup — already done, do NOT redo
 
@@ -28,7 +26,7 @@ The signed-and-notarized macOS release flow, end to end.
 
 ### 1. Version
 Pick `vX.Y.Z` and a `CFBundleVersion` that is a monotonic integer **strictly
-greater** than the last release (v0.5.9 = `1777000007`; increment by 1). Bump it
+greater** than the last shipped release (currently v0.5.10 = `1777000008`; increment by 1). Bump it
 in `CLAUDE.md` (Latest release line), `Casks/joint-chiefs.rb` (`version`),
 `docs/BUILD-PLAN.md` (release log), and any other version-tagged docs.
 
@@ -54,7 +52,12 @@ cp -R "build/Joint Chiefs.app" "$STAGE/Joint Chiefs.app"
 xattr -cr "$STAGE/Joint Chiefs.app"
 
 APP="$STAGE/Joint Chiefs.app"
-ID="Developer ID Application: Chris Doyle (VJMJQKCRMC)"
+# Sign by certificate SHA-1 hash, NOT by name. Two "Developer ID Application:
+# Chris Doyle (VJMJQKCRMC)" certs live in the login keychain (renewal overlap),
+# so `--sign "Developer ID Application: ..."` fails with "ambiguous" and silently
+# leaves the bundle ad-hoc/linker-signed — notarization then returns Invalid
+# ("no usable signature"). Confirm the hash with `security find-identity -v -p codesigning`.
+ID="E2EF8DBDD708A1857D5688F424272BE6821E463E"
 
 # Sign inside-out: nested executables, then the framework, then the bundle.
 codesign --force --options runtime --timestamp --sign "$ID" \

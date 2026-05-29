@@ -1,7 +1,7 @@
 # Joint Chiefs — Design System
 
-**Version:** 1.2
-**Last Updated:** 2026-04-26
+**Version:** 1.3
+**Last Updated:** 2026-05-27
 **Source of truth:** [Agentdeck design system](https://ui-engine-gallery.netlify.app/agentdeck/design-system)
 **Companion:** [`../../Joint Chiefs Website/docs/DESIGN-SYSTEM.md`](../../Joint%20Chiefs%20Website/docs/DESIGN-SYSTEM.md) — same tokens, CSS implementation
 
@@ -41,7 +41,7 @@ Tokens live in `Sources/JointChiefsSetup/DesignSystem/AgentdeckTokens.swift`. Th
 |---|---|---|
 | Primary | `Color.agentTextPrimary` | `#f3f2f1` |
 | Body | `Color.agentTextBody` | `#a5a09c` |
-| Muted | `Color.agentTextMuted` | `#795f5d` |
+| Muted | `Color.agentTextMuted` | `#8a807c` |
 | Warm-tan accent | `Color.agentTextAccent` | `#a4847f` |
 
 ### Borders
@@ -156,8 +156,8 @@ enum AgentRadius {
 
 ```swift
 enum AgentShadow {
-    static let card   = (color: Color.black.opacity(0.04), radius: CGFloat(2),  x: CGFloat(0), y: CGFloat(1))
-    static let popover = (color: Color.black.opacity(0.08), radius: CGFloat(24), x: CGFloat(0), y: CGFloat(8))
+    static let card   = (color: Color.black.opacity(0.40), radius: CGFloat(2),  x: CGFloat(0), y: CGFloat(1))
+    static let popover = (color: Color.black.opacity(0.55), radius: CGFloat(24), x: CGFloat(0), y: CGFloat(8))
     static let window = (color: Color.black.opacity(0.45), radius: CGFloat(48), x: CGFloat(0), y: CGFloat(24))
     static let focus  = (color: Color.agentSuccess.opacity(0.35), radius: CGFloat(2), x: CGFloat(0), y: CGFloat(0))
 }
@@ -366,3 +366,9 @@ Map the Agentdeck components onto existing setup app views:
 - `DATA-MODEL.md` — type definitions
 - `KNOWN-ISSUES.md` — active issues
 - `../../Joint Chiefs Website/docs/DESIGN-SYSTEM.md` — CSS-side of the same tokens
+
+## Revision History
+
+| Version | Date | Changes |
+|---|---|---|
+| 1.3 | 2026-05-27 | Synced muted text and shadow token values with `AgentdeckTokens.swift`. |

@@ -6,12 +6,12 @@
 Multi-model AI code review orchestrator. Four surfaces — CLI, stdio MCP server, macOS setup app, and a single credential-file-access binary — all built from one `JointChiefsCore` engine. Sends code to multiple LLMs, runs a structured hub-and-spoke debate with Claude as moderator/decider, and streams a consensus summary back. Grounded in Multi-Agent Debate (MAD) research showing debate improves factuality and reasoning over single-model output.
 
 **Website:** https://jointchiefs.ai/ (live — source in the private `djfunboy/joint-chiefs-website` repo; this repo is the app)
-**Latest release:** v0.5.9 — Gemini default model refresh. Gemini now defaults to `gemini-3.5-flash`, the setup app's curated Gemini picker starts with that model, and docs/tests were updated so the picker-order invariant stays covered. 90+ tests. CFBundleVersion `1777000007`. Builds on v0.5.8.
+**Latest release:** v0.5.10 — Claude Opus 4.8 default. Anthropic now defaults to `claude-opus-4-8` (the moderator model); the curated Anthropic picker leads with Opus 4.8 (Opus 4.7 demoted to prior flagship), and the `ModelTests` default + picker-order assertions were updated. 93 tests. CFBundleVersion `1777000008`. Builds on v0.5.9.
 **Next session:** start by reading the most recent `tasks/SESSION-HANDOFF-*.md` (gitignored; local-only).
 
 ## Current State
 
-- **Phases 1–3, 5, 8, and 10 complete.** Phase 6 (setup app) ships its full five-view installer with the v0.5.0 "Configured AI tools" panel showing per-tool MCP wire-up status; remaining items are accessibility (VoiceOver / Dynamic Type) and a v0.5.6→v0.5.7 Keychain-migration round-trip test, both tracked under Phase 9. Website live at jointchiefs.ai with notarized DMGs + Sparkle appcast through v0.5.9.
+- **Phases 1–3, 5, 8, and 10 complete.** Phase 6 (setup app) ships its full five-view installer with the v0.5.0 "Configured AI tools" panel showing per-tool MCP wire-up status; remaining items are accessibility (VoiceOver / Dynamic Type) and a v0.5.6→v0.5.7 Keychain-migration round-trip test, both tracked under Phase 9. Website live at jointchiefs.ai with notarized DMGs + Sparkle appcast through v0.5.10.
 - **CLI installed** at `/opt/homebrew/bin/jointchiefs` (Apple Silicon only). Calls the orchestrator directly — no local HTTP server.
 - **MCP server** at `jointchiefs-mcp` — stdio-only, wraps the orchestrator via `modelcontextprotocol/swift-sdk` pinned exact 0.12.0. Spawned by any MCP-aware client via JSON-RPC over stdio.
 - **Setup app** at `jointchiefs-setup` — one-shot SwiftUI installer (Usage / Keys / Roles & Weights / MCP Config / Privacy). All five views use Agentdeck tokens end-to-end. CLI binaries install silently on first launch — no manual destination picker. Credential-file access goes through the keygetter only; the app runs a one-time legacy-Keychain migration at launch.
@@ -64,7 +64,7 @@ Optional model overrides (env vars): `OPENAI_MODEL`, `GEMINI_MODEL`, `GROK_MODEL
 
 Strategy (moderator / tiebreaker / consensus mode / rounds / timeout / per-provider weights) is persisted as `StrategyConfig` — see `docs/DATA-MODEL.md`.
 
-**Default models:** `gpt-5.5`, `gemini-3.5-flash`, `grok-4.3`, `claude-opus-4-7`
+**Default models:** `gpt-5.5`, `gemini-3.5-flash`, `grok-4.3`, `claude-opus-4-8`
 **Default debate settings:** 5 rounds with adaptive early break, 120s per-request timeout
 
 ### Local API Keys (dev only)

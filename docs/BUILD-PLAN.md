@@ -1,7 +1,7 @@
 # Joint Chiefs — Build Plan
 
-**Version:** 1.9
-**Last Updated:** 2026-05-17
+**Version:** 1.11
+**Last Updated:** 2026-05-27
 
 ## What's Built
 
@@ -21,7 +21,7 @@ CLI, stdio MCP server, setup app, and credential-file keygetter.
 - **Per-provider model override:** `StrategyConfig.providerModels` lets users pick from `ProviderType.availableModels` (curated top 5 per provider) — resolution priority `providerModels[type]` > env var > `ProviderType.defaultModel`
 - **Setup app:** `jointchiefs-setup` SwiftUI executable shipping its full five-section installer — Usage / Keys / Roles & Weights / MCP Config / Privacy. All views use Agentdeck tokens (`agentBgPanel`, `AgentInputStyle`, `AgentPill`, `AgentChip`, `agentPanel`, `.agentPrimary` / `.agentSecondary` / `.agentDanger` button styles). CLI binaries install silently into `/opt/homebrew/bin` (or `~/.local/bin` fallback) on first launch — no manual destination picker.
 - **Website live at [jointchiefs.ai](https://jointchiefs.ai/)** — static site deployed via Netlify with auto-deploy on push to main. Source in the private `djfunboy/joint-chiefs-website` repo. Custom domain + Let's Encrypt cert configured.
-- **Fifteen releases shipped:** v0.1.0 → v0.2.0 → v0.3.0 → v0.3.1 → v0.4.0 → v0.5.0 → v0.5.1 (docs-only) → v0.5.2 (Sparkle build-number hotfix) → v0.5.3 (curated model-list refresh — GPT-5.5, Claude Opus 4.7, Grok 4.20 reasoning) → v0.5.4 (OpenAI-compat dropdown UX + Gemini list refresh) → v0.5.5 (filter non-chat models from the OpenAI-compat dropdown) → v0.5.6 (critical OpenAI `temperature` fix + full model-list refresh + MCP progress side-channels + in-context Keychain prompt) → v0.5.7 (API keys moved off the macOS Keychain into a `0600` `credentials.json` file so the CLI/MCP work headless; one-time legacy-Keychain migration) → v0.5.8 (hard-coded anti-over-engineering calibration in the centralized `ReviewPrompts`) → v0.5.9 (Gemini default refresh to `gemini-3.5-flash`). Notarized + stapled DMGs through v0.5.9; Sparkle appcast carries v0.5.0 + v0.5.2 + v0.5.3 + v0.5.4 + v0.5.5 + v0.5.6 + v0.5.7 + v0.5.8 + v0.5.9 (pre-v0.5.0 entries removed after the build-number bug — see `tasks/lessons.md` 2026-04-26). Homebrew cask SHA wired to v0.5.9.
+- **Sixteen releases shipped:** v0.1.0 → v0.2.0 → v0.3.0 → v0.3.1 → v0.4.0 → v0.5.0 → v0.5.1 (docs-only) → v0.5.2 (Sparkle build-number hotfix) → v0.5.3 (curated model-list refresh — GPT-5.5, Claude Opus 4.7, Grok 4.20 reasoning) → v0.5.4 (OpenAI-compat dropdown UX + Gemini list refresh) → v0.5.5 (filter non-chat models from the OpenAI-compat dropdown) → v0.5.6 (critical OpenAI `temperature` fix + full model-list refresh + MCP progress side-channels + in-context Keychain prompt) → v0.5.7 (API keys moved off the macOS Keychain into a `0600` `credentials.json` file so the CLI/MCP work headless; one-time legacy-Keychain migration) → v0.5.8 (hard-coded anti-over-engineering calibration in the centralized `ReviewPrompts`) → v0.5.9 (Gemini default refresh to `gemini-3.5-flash`) → v0.5.10 (Claude Opus 4.8 default — Anthropic now defaults to `claude-opus-4-8`, picker leads with Opus 4.8). Notarized + stapled DMGs through v0.5.10; Sparkle appcast carries v0.5.0 + v0.5.2 + v0.5.3 + v0.5.4 + v0.5.5 + v0.5.6 + v0.5.7 + v0.5.8 + v0.5.9 + v0.5.10 (pre-v0.5.0 entries removed after the build-number bug — see `tasks/lessons.md` 2026-04-26). Homebrew cask SHA wired to v0.5.10.
 - **90+ tests passing** (unit + orchestrator integration + consensus-mode coverage + weighted-voting + CredentialStore file-store coverage + ReviewPrompts calibration coverage + APIKeyResolver with fake-keygetter harness; exact count changes over time)
 
 Phases 1–3, 5, 8, and 10 are complete. Phase 6 (setup app) ships its full
@@ -266,7 +266,7 @@ reversed in favor of the standard Apple Developer flow.
 2. ✅ `jointchiefs-keygetter` target building and producing expected exit codes
 3. ✅ Public repo shipped — `github.com/djfunboy/joint-chiefs` (MIT)
 4. ✅ Website shipped — `jointchiefs.ai` live via Netlify, custom domain + SSL configured; source in private `djfunboy/joint-chiefs-website` repo
-5. ✅ Release signing — `scripts/build-app.sh` signs `jointchiefs-setup`, `jointchiefs`, `jointchiefs-mcp`, `jointchiefs-keygetter` with Developer ID; keygetter with `--identifier com.jointchiefs.keygetter` per the Keychain-ACL design
+5. ✅ Release signing — release flow stages the unsigned bundle outside Dropbox, signs nested binaries/framework/bundle with Developer ID, notarizes, staples, and verifies Gatekeeper acceptance. `scripts/build-app.sh` only assembles the unsigned app bundle and patches the Sparkle rpath; signing/notarization lives in `distribution/release-process.md`.
 6. ✅ Notarization workflow — DMGs notarized + stapled since v0.1.0
 7. ✅ DMG artifact — `Joint-Chiefs.dmg` shipped for v0.1.0 through v0.4.0 with app bundle + CLI binaries in `Contents/Resources/`
 8. ✅ Sparkle integration — wired in v0.2.0 (commit `ae8dfe0`); v0.3.1 hotfix landed `install_name_tool` rpath patch in `scripts/build-app.sh` to fix the dyld-resolution failure that crashed v0.2.0 + v0.3.0 on cold-machine launch
@@ -279,7 +279,7 @@ reversed in favor of the standard Apple Developer flow.
 
 ## Post-Launch
 
-- **Homebrew distribution:** `brew install jointchiefs`
+- **Homebrew distribution:** `brew tap djfunboy/jointchiefs && brew install --cask joint-chiefs`
 - **Additional providers:** Mistral, DeepSeek
 - **Team features:** Shared configs, review history sync
 - **CI integration:** `jointchiefs review --ci` for pipeline use
@@ -299,3 +299,4 @@ reversed in favor of the standard Apple Developer flow.
 | 1.8 | 2026-05-17 | v0.5.7 — API keys moved off the macOS Keychain into a `0600` `credentials.json` file (`CredentialStore`) so the CLI and MCP server work headless; the Keychain's GUI access prompt can't be answered over SSH/cron. `KeychainService` → `LegacyKeychainStore` (read-only, migration path); `keygetter migrate` subcommand carries v0.5.6 keys forward. Release log updated to thirteen releases; test count 81 → 87 (CredentialStore coverage). Stale "Keychain" references reconciled across "What's Built", Phase 6, and Phase 9. |
 | 1.9 | 2026-05-17 | v0.5.8 — hard-coded anti-over-engineering calibration in the review prompts. All review/debate/moderator prompts centralized into a new `ReviewPrompts` enum (were byte-identical copy-paste across 5 provider files); each now carries a proportionality bar, a converge-and-cut debate framing, and a moderator cut-instruction (cap 15 → 10). Release log updated to fourteen releases; test count 87 → 92 (`ReviewPromptsTests`). |
 | 1.10 | 2026-05-26 | v0.5.9 — Gemini default model refreshed to `gemini-3.5-flash`; picker-order tests now assert curated provider lists start with each provider's default. Release log updated to fifteen releases. |
+| 1.11 | 2026-05-27 | Corrected Phase 10 signing text to match the release process: `build-app.sh` assembles an unsigned bundle; manual release signing/notarization happens from a staged copy outside Dropbox. Corrected Homebrew install command to the cask path. |

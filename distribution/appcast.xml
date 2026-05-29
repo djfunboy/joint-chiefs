@@ -46,6 +46,26 @@
         -->
 
         <item>
+            <title>Version 0.5.10</title>
+            <pubDate>Fri, 29 May 2026 00:35:00 +0000</pubDate>
+            <sparkle:version>1777000008</sparkle:version>
+            <sparkle:shortVersionString>0.5.10</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[
+                <h2>What's new</h2>
+                <ul>
+                    <li>Claude now defaults to <code>claude-opus-4-8</code> — Anthropic's most capable model — as the moderator/decider.</li>
+                    <li>The setup app's curated Anthropic picker leads with Opus 4.8; Opus 4.7 remains selectable as the prior flagship.</li>
+                </ul>
+            ]]></description>
+            <enclosure
+                url="https://github.com/djfunboy/joint-chiefs/releases/download/v0.5.10/Joint-Chiefs.dmg"
+                length="5996816"
+                type="application/octet-stream"
+                sparkle:edSignature="R0NjF0MJkFJ4WymKcmKLZdvVDSw5DhAB6kpq/PXoCv/l3aS7XGs/R6/qgM6W2S9V+URykwFR4MsK0HTw/FiFAA=="/>
+        </item>
+
+        <item>
             <title>Version 0.5.9</title>
             <pubDate>Tue, 26 May 2026 21:37:16 +0000</pubDate>
             <sparkle:version>1777000007</sparkle:version>

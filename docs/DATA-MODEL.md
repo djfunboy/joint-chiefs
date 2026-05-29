@@ -1,7 +1,7 @@
 # Joint Chiefs — Data Model
 
-**Version:** 1.2
-**Last Updated:** 2026-04-26
+**Version:** 1.3
+**Last Updated:** 2026-05-27
 
 ## Live Configuration Types
 
@@ -261,7 +261,7 @@ public enum ProviderType: String, Codable, CaseIterable, Sendable {
     public var defaultModel: String {
         switch self {
         case .openAI: "gpt-5.5"
-        case .anthropic: "claude-opus-4-7"
+        case .anthropic: "claude-opus-4-8"
         case .gemini: "gemini-3.5-flash"
         case .grok: "grok-4.3"           // ← now active
         case .ollama: "llama3"
@@ -413,9 +413,14 @@ enum ReviewStatus: String, Codable {
 }
 ```
 
-## Keychain Storage
+## Legacy Deferred Keychain Storage (not live)
 
-API keys are NOT stored in SwiftData. Each `ProviderConfig` has a `keychainID` string that references a Keychain item:
+This section is retained only for the deferred menu-bar SwiftData schema. It is
+not the shipping credential path. Current API keys live in `credentials.json`
+via `CredentialStore` and are accessed only through `jointchiefs-keygetter`.
+
+In the deferred schema, API keys are NOT stored in SwiftData. Each
+`ProviderConfig` has a `keychainID` string that references a Keychain item:
 
 ```swift
 // Store
@@ -439,3 +444,4 @@ Keychain items use:
 | 1.0 | 2026-04-08 | Initial data model |
 | 1.1 | 2026-04-19 | Added "Live Configuration Types" section describing `StrategyConfig` (including `providerWeights`) and `ProviderType` as they actually exist in the shipping codebase. Marked the SwiftData section as deferred-menu-bar-app reference material. |
 | 1.2 | 2026-04-26 | Reconciled `StrategyConfig` with shipping fields the v1.1 doc was missing: `providerModels` (per-provider model override; v0.3.0), `ollama: OllamaConfig` (first-class config; v0.3.0+), `openAICompatible: OpenAICompatibleConfig` (LM Studio / Jan / llama.cpp-server / Msty / LocalAI; v0.4.0). Added the `.openAICompatible` case to the live `ProviderType` enum and documented `availableModels` (curated top-5 picker source). Added new sections describing `providerModels`, `ollama`, and `openAICompatible` semantics + on-disk JSON shape. |
+| 1.3 | 2026-05-27 | Marked the Keychain section as legacy/deferred so it cannot be mistaken for the shipping v0.5.7+ credential-file path. |

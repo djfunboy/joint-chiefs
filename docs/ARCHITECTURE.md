@@ -1,7 +1,7 @@
 # Joint Chiefs — Architecture
 
-**Version:** 1.7
-**Last Updated:** 2026-04-30
+**Version:** 1.8
+**Last Updated:** 2026-05-27
 
 **Website:** [jointchiefs.ai](https://jointchiefs.ai/) — deployed via Netlify. Source in the private `djfunboy/joint-chiefs-website` repo.
 **App repo:** [github.com/djfunboy/joint-chiefs](https://github.com/djfunboy/joint-chiefs) (public, MIT).
@@ -9,14 +9,14 @@
 ## System Overview
 
 Joint Chiefs uses a **hub-and-spoke** debate model. The "generals" (any of
-OpenAI, Gemini, Grok, Ollama, or an OpenAI-compatible local server such as
-LM Studio / Jan / llama.cpp-server / Msty / LocalAI) each review the code
-independently and send their findings to the moderator (Claude by default,
-configurable via `StrategyConfig.moderator`). The moderator synthesizes the
-round's findings, sends the anonymized synthesis back to the generals for
-the next round, and — once consensus is reached or max rounds hit — writes
-the final summary. A code-based `ConsensusBuilder` is available as a
-fallback if the moderator is unavailable.
+OpenAI, Anthropic Claude, Gemini, Grok, Ollama, or an OpenAI-compatible local
+server such as LM Studio / Jan / llama.cpp-server / Msty / LocalAI) each review
+the code independently and send their findings to the moderator (Claude by
+default, configurable via `StrategyConfig.moderator`). The moderator synthesizes
+the round's findings, sends the anonymized synthesis back to the generals for
+the next round, and — once consensus is reached or max rounds hit — writes the
+final summary. A code-based `ConsensusBuilder` is available as a fallback if the
+moderator is unavailable.
 
 Every review/debate/moderator prompt is centralized in `ReviewPrompts.swift`
 and hard-codes an **anti-over-engineering calibration** posture. A hub-and-spoke
@@ -137,7 +137,7 @@ protocol ReviewProvider: Sendable {
 ```
 
 All providers conform to this protocol. Each provider:
-- Wraps a single LLM API (OpenAI, Gemini, xAI, Ollama)
+- Wraps a single LLM API (OpenAI, Anthropic Claude, Gemini, xAI, Ollama, or an OpenAI-compatible endpoint)
 - Handles its own authentication and request formatting
 - Returns a structured `ProviderReview` with typed findings
 
@@ -290,25 +290,25 @@ Exit code contract (callers depend on these):
          │
 2. DebateOrchestrator.startReview()
          │
-3. ┌─────┼─────┐─────┐
-   │     │     │     │     Parallel: independent reviews
-   ▼     ▼     ▼     ▼
-  GPT  Gemini Grok  Ollama
-   │     │     │     │
-   └─────┼─────┘─────┘
+3. ┌─────┬──────┬─────┬─────┬───────┬──────────────┐
+   │     │      │     │     │       │              │  Parallel: independent reviews
+   ▼     ▼      ▼     ▼     ▼       ▼              ▼
+ OpenAI Claude Gemini Grok Ollama OpenAI-compatible
+   │     │      │     │     │       │
+   └─────┴──────┴─────┴─────┴───────┘
          │
 4. Collect findings, build round 1 context
          │
-5. ┌─────┼─────┐─────┐
-   │     │     │     │     Debate round 1: challenge findings
-   ▼     ▼     ▼     ▼
-  GPT  Gemini Grok  Ollama
-   │     │     │     │
-   └─────┼─────┘─────┘
+5. ┌─────┬──────┬─────┬─────┬───────┬──────────────┐
+   │     │      │     │     │       │              │  Debate round 1: challenge findings
+   ▼     ▼      ▼     ▼     ▼       ▼              ▼
+ OpenAI Claude Gemini Grok Ollama OpenAI-compatible
+   │     │      │     │     │       │
+   └─────┴──────┴─────┴─────┴───────┘
          │
 6. Repeat for configured rounds
          │
-7. ConsensusBuilder.synthesize()
+7. Moderator synthesis (ConsensusBuilder fallback)
          │
    ┌─────┴──────┐
    │             │
@@ -399,7 +399,7 @@ for enum-keyed dictionaries. See the custom `init(from:)` / `encode(to:)` in
 | `GROK_API_KEY` | xAI Grok authentication | (required to enable Grok) |
 | `GROK_MODEL` | Grok model override | `grok-4.3` |
 | `ANTHROPIC_API_KEY` | Anthropic authentication — also serves as deciding model | (required to enable Claude) |
-| `ANTHROPIC_MODEL` | Claude model override | `claude-opus-4-7` |
+| `ANTHROPIC_MODEL` | Claude model override | `claude-opus-4-8` |
 | `OLLAMA_ENABLED` | Set to `1` to force-include / `0` to force-exclude the local Ollama general (overrides `StrategyConfig.ollama.enabled`) | unset (use `StrategyConfig`) |
 | `OLLAMA_MODEL` | Ollama model override | `llama3` |
 | `OPENAI_COMPATIBLE_BASE_URL` | Force-enable an OpenAI-compatible local server (LM Studio, Jan, llama.cpp-server, Msty, LocalAI). CI override for `StrategyConfig.openAICompatible`. | unset |
@@ -467,10 +467,10 @@ look indistinguishable from a hang.
 
 - **App repo:** public at [github.com/djfunboy/joint-chiefs](https://github.com/djfunboy/joint-chiefs) — MIT licensed.
 - **Website:** [jointchiefs.ai](https://jointchiefs.ai/) — static HTML + shared `styles.css`, Agentdeck palette matching the setup app. Hosted on Netlify; source is a separate private repo (`djfunboy/joint-chiefs-website`) with auto-deploy on push to main. Netlify manages the apex domain + `www` alias + Let's Encrypt cert.
-- **Release artifact:** notarized + stapled DMG containing `Joint Chiefs.app` with the four binaries in `Contents/Resources/` (CLI/MCP/keygetter) and `Contents/MacOS/jointchiefs-setup`. Shipped through v0.5.9; SHA-256 wired into `Casks/joint-chiefs.rb`.
-- **Sparkle appcast** at [jointchiefs.ai/appcast.xml](https://jointchiefs.ai/appcast.xml) — EdDSA-signed entries for v0.5.0, v0.5.2, v0.5.3, v0.5.4, v0.5.5, v0.5.6, v0.5.7, v0.5.8, and v0.5.9. Pre-v0.5.0 entries were stripped after the v0.5.0 build-number bug (see `tasks/lessons.md` 2026-04-26 — they used Unix-timestamp `CFBundleVersion` values that exceeded v0.5.0's sequential `5`, causing Sparkle to "downgrade" fresh installs).
+- **Release artifact:** notarized + stapled DMG containing `Joint Chiefs.app` with the four binaries in `Contents/Resources/` (CLI/MCP/keygetter) and `Contents/MacOS/jointchiefs-setup`. Shipped through v0.5.10; SHA-256 wired into `Casks/joint-chiefs.rb`.
+- **Sparkle appcast** at [jointchiefs.ai/appcast.xml](https://jointchiefs.ai/appcast.xml) — EdDSA-signed entries for v0.5.0, v0.5.2, v0.5.3, v0.5.4, v0.5.5, v0.5.6, v0.5.7, v0.5.8, v0.5.9, and v0.5.10. Pre-v0.5.0 entries were stripped after the v0.5.0 build-number bug (see `tasks/lessons.md` 2026-04-26 — they used Unix-timestamp `CFBundleVersion` values that exceeded v0.5.0's sequential `5`, causing Sparkle to "downgrade" fresh installs).
 - **Auto-update path:** Sparkle for the app bundle. The `UpdaterService` wrapper drives the sidebar update-status footer. No custom updater for the CLI or MCP binaries — Sparkle replaces the bundle and the bundled binaries get re-installed via `SetupModel.installCLIIfNeeded()` on next launch. A fresh `brew install --cask joint-chiefs` (homebrew tap pending) achieves the same.
-- **Build scripts:** `scripts/build-app.sh` (Release build + bundle assembly + Sparkle.framework copy + `install_name_tool` rpath patch + Developer ID signing), `scripts/build-dmg.sh` (DMG creation + notarization submit + staple), `scripts/generate-icon.sh` (icon `.icns` from PDF source).
+- **Build scripts:** `scripts/build-app.sh` (Release build + unsigned bundle assembly + Sparkle.framework copy + `install_name_tool` rpath patch), `scripts/build-dmg.sh` (unsigned development DMG creation), `scripts/generate-icon.sh` (icon `.icns` from PDF source). Release signing, notarization, stapling, and appcast updates are documented in `distribution/release-process.md`.
 
 ## Revision History
 
@@ -484,3 +484,4 @@ look indistinguishable from a hang.
 | 1.5 | 2026-04-25 | Reconciled the Tech Stack and DebateOrchestrator sections with shipping reality — replaced the "Menu bar app, settings, transcript viewer" stack row with the four shipped surfaces (setup app, CLI, MCP server, keygetter); replaced "SwiftData persistence" with `StrategyConfig` JSON + local transcript files (SwiftData remains reserved for the deferred menu bar app). Bumped default debate rounds from 2 → 5 with adaptive early-break. Removed the "setup app is deferred" line above the project tree. Data-flow note flipped from "CLI or HTTP" to "CLI invocation or MCP tool call." |
 | 1.6 | 2026-04-26 | Reconciled v0.4.0 + v0.5.0 changes that drifted from the doc. Added the 6th provider type (`openAICompatible` — LM Studio / Jan / llama.cpp-server / Msty / LocalAI) to the System Overview, ASCII diagram, project tree, streaming-providers list, and configuration env-var table. Rewrote the Setup App section: five sections are now Usage / Keys / Roles & Weights / MCP Config / Privacy (Install pane was replaced by silent auto-install in v0.3.0; "How to Use" is the new first screen; "Privacy" is the renamed Disclosure). Documented the v0.5.0 "Configured AI tools" panel and sidebar update-status footer with `MCPConfigScanner` and `UpdaterService`. Fixed the Development Environment dependencies line — removed Hummingbird and SwiftData (never landed / not used), listed the actual three deps from `Package.swift`. Distribution section reflects shipped state: notarized DMGs through v0.5.0, Sparkle appcast live, build-script trio (`build-app.sh`, `build-dmg.sh`, `generate-icon.sh`). |
 | 1.7 | 2026-04-30 | Replaced the absurd "Full review (3 models, 2 rounds) < 90s" performance target. Realistic latency for a hub-and-spoke debate is minutes for cloud-only panels and 15+ minutes when a local model is in the panel — that's inference cost, not a hang. Added the three side channels for progress visibility (MCP `notifications/progress`, `jointchiefs-mcp` stderr heartbeats, and `~/Library/Caches/Joint Chiefs/current-review.json` status file) so a host UI showing only elapsed time doesn't make a working run look stuck. Source: tasks/lessons.md 2026-04-30 (`<90s` target retired) and the new `ProgressBroadcaster` in `JointChiefsMCPServer.swift`. |
+| 1.8 | 2026-05-27 | Corrected provider lists and data-flow diagram to show all six provider surfaces plus moderator-led synthesis. Corrected Distribution to state that `build-app.sh` assembles an unsigned bundle; release signing/notarization lives in `distribution/release-process.md`. |

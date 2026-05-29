@@ -140,6 +140,22 @@ This list is part of step 5 (doc scan) of the "Pre-release review (public repo)"
 **What happened:** During the v0.5.7 release I edited `Casks/joint-chiefs.rb` to insert the real notarized-DMG `sha256` (the hash→cask step), but never committed that edit. The earlier version-bump commit carried a *placeholder* sha. When PR #13 was rebase-merged, it captured the committed state — the placeholder — not the working-tree edit. Caught only because `gh pr merge`'s internal `git checkout` aborted on the dirty file; otherwise v0.5.7 could have tagged with a cask pointing at the wrong hash, breaking `brew install --cask`.
 **Rule:** A file edit is not in a release until it is committed. Release artifacts edited late in the sequence — cask `sha256`, appcast `<item>`, version strings — must each be committed as they are produced, not left in the working tree to be "picked up later." Before any merge or tag, run `git status` and require a clean working tree; an uncommitted change means the merge/tag will silently capture stale committed content. `gh pr merge` merges the *remote branch*, not your local working tree — local edits that were never pushed are simply absent from the merge.
 
+### 2026-05-25: Exact test counts are not useful doc drift
+**What happened:** During a session-start doc drift pass, I treated old exact test-count references (`60 tests`, `81 passing`) as drift and updated them to the current exact count. Chris clarified that he does not care about precise test-count churn in docs; exact counts age quickly and create busywork.
+**Rule:** Do not flag or churn docs solely because an exact test count changed. Prefer ranges like "90+ tests" or wording that says the count changes over time and `swift test` is authoritative. Historical revision-history counts can remain as history unless they actively mislead current-state guidance.
+
+### 2026-05-25: Apple TV dashboard widgets can feel too large, not too small
+**What happened:** While discussing a 16:9 Apple TV dashboard layout, I assumed widgets that look large in a desktop preview would feel smaller on a TV because of viewing distance. Chris corrected this: on a big wall-mounted TV, a widget occupying a large share of the 16:9 canvas becomes physically huge.
+**Rule:** For Apple TV / wall-mounted dashboards, do not default to enlarging widgets for "10-foot UI." First control physical dominance: use more canvas structure, cap widget spans, reserve dead space for utility/status, and test composition as a full-screen wall display. A widget that seems merely acceptable in a desktop browser preview can be oversized in the real installation.
+
+### 2026-05-25: Do not turn ordinary project context into lessons
+**What happened:** Chris clarified operational context about Hermes, and I added a long `tasks/lessons.md` entry even though it was not a correction or behavioral failure.
+**Rule:** Use `tasks/lessons.md` only for corrections and repeatable mistake-prevention rules. Ordinary project facts, host context, access notes, and operating assumptions belong in `AGENTS.md` / `CLAUDE.md`, not in lessons.
+
+### 2026-05-28: codesign by name failed silently — two Developer ID certs share the name
+**What happened:** During the v0.5.10 release, signing with `--sign "Developer ID Application: Chris Doyle (VJMJQKCRMC)"` printed `ambiguous (matches ... and ...)` for every binary because a second Developer ID Application cert with the identical name now lives in the login keychain (renewal overlap). codesign signed nothing, the bundle stayed ad-hoc/linker-signed, and notarization returned `Invalid: no usable signature` — yet the release script still exited 0 (the failing codesign and stapler were not the script's final command).
+**Rule:** Sign Joint Chiefs by the certificate SHA-1 **hash** (`E2EF8DBDD708A1857D5688F424272BE6821E463E`), never by name — `distribution/release-process.md` is updated to match. After signing and before building the DMG, hard-gate on `codesign -dv` showing `Authority=Developer ID Application` AND `TeamIdentifier=VJMJQKCRMC`. Never trust a build script's exit code as proof a signature took.
+
 ## Common Traps
 
 _To be populated during development._

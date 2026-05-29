@@ -159,7 +159,7 @@ Full details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 | `GROK_API_KEY` | xAI Grok authentication | (required to enable Grok) |
 | `GROK_MODEL` | Grok model override | `grok-4.3` |
 | `ANTHROPIC_API_KEY` | Anthropic — also serves as moderator | (required to enable Claude) |
-| `ANTHROPIC_MODEL` | Claude model override | `claude-opus-4-7` |
+| `ANTHROPIC_MODEL` | Claude model override | `claude-opus-4-8` |
 | `OLLAMA_ENABLED` | Set to `1` to force-include / `0` to force-exclude the local Ollama general (overrides `StrategyConfig.ollama.enabled`) | unset (use `StrategyConfig`) |
 | `OLLAMA_MODEL` | Ollama model override | `llama3` |
 | `OPENAI_COMPATIBLE_BASE_URL` | Force-enable an OpenAI-compatible local server (LM Studio, Jan, llama.cpp-server, Msty, LocalAI). CI override for `StrategyConfig.openAICompatible`. | unset |

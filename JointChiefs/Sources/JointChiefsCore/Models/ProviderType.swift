@@ -17,7 +17,7 @@ public enum ProviderType: String, Codable, CaseIterable, Sendable {
     public var defaultModel: String {
         switch self {
         case .openAI: "gpt-5.5"
-        case .anthropic: "claude-opus-4-7"
+        case .anthropic: "claude-opus-4-8"
         case .gemini: "gemini-3.5-flash"
         case .grok: "grok-4.3"
         case .ollama: "llama3"
@@ -45,11 +45,11 @@ public enum ProviderType: String, Codable, CaseIterable, Sendable {
             ]
         case .anthropic:
             return [
-                "claude-opus-4-7",               // flagship (default — moderator)
-                "claude-opus-4-6",               // prior flagship
+                "claude-opus-4-8",               // flagship (default — moderator)
+                "claude-opus-4-7",               // prior flagship
+                "claude-opus-4-6",               // older flagship
                 "claude-sonnet-4-6",             // balanced
-                "claude-haiku-4-5-20251001",     // fast + cheap
-                "claude-sonnet-4-5-20250929"     // prior-gen sonnet fallback
+                "claude-haiku-4-5-20251001"      // fast + cheap
             ]
         case .gemini:
             return [

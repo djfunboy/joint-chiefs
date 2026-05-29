@@ -1,6 +1,6 @@
 # Joint Chiefs — Known Issues
 
-**Last Updated:** 2026-05-17
+**Last Updated:** 2026-05-27
 
 A running list of known bugs, limitations, and rough edges. PRs that fix any of these are welcome.
 
@@ -18,7 +18,7 @@ All six setup-app view files (`RootView`, `UsageView`, `KeysView`, `RolesWeights
 ## Known Limitations
 
 - **MCP SDK pinned pre-1.0.** `modelcontextprotocol/swift-sdk` is pinned to exact `0.12.0` in `Package.swift`. Review the SDK's release notes before bumping — the protocol and API surface may change across 0.x versions.
-- **Keygetter discovery is best-effort.** `APIKeyResolver.locateKeygetter` checks `JOINTCHIEFS_KEYGETTER_PATH`, sibling-of-caller, and `/Applications/Joint Chiefs.app/Contents/Resources/`. If a user installs the app bundle elsewhere, they need to set the env var. Document in SECURITY.md before launch.
+- **Keygetter discovery is best-effort.** `APIKeyResolver.locateKeygetter` checks `JOINTCHIEFS_KEYGETTER_PATH`, sibling-of-caller, `../Resources/` relative to the running executable, and `/Applications/Joint Chiefs.app/Contents/Resources/`. If a user installs the app bundle somewhere nonstandard and the sibling/resource lookups do not apply, they need to set the env var.
 - **Legacy-Keychain migration isn't end-to-end tested.** `CredentialStore` (the live file store) is covered by unit tests, and the setup app's Save verifies its own write round-trip. But the `keygetter migrate` path reads v0.5.6-era items out of the macOS Keychain — `LegacyKeychainStore.retrieve` can't be sandboxed in a unit test (it needs a real Keychain item and may surface an access prompt). Migration is tracked as manual QA: install v0.5.7 on a machine with v0.5.6 Keychain keys and confirm they land in `credentials.json` with the Keychain items removed.
 - **Convergence detection is title-similarity based.** The adaptive early-break heuristic compares finding titles across rounds. It may stop debate too early when models phrase the same finding differently, or too late when they word the same surface issue identically but disagree on substance.
 
