@@ -46,6 +46,26 @@
         -->
 
         <item>
+            <title>Version 0.5.11</title>
+            <pubDate>Fri, 12 Jun 2026 13:22:21 +0000</pubDate>
+            <sparkle:version>1777000009</sparkle:version>
+            <sparkle:shortVersionString>0.5.11</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[
+                <h2>What's new</h2>
+                <ul>
+                    <li>Updated AI models: <code>claude-fable-5</code> (Claude Fable 5) is the new moderator default.</li>
+                    <li>Refreshed provider model lists — every shipped model id re-verified against live provider APIs.</li>
+                </ul>
+            ]]></description>
+            <enclosure
+                url="https://github.com/djfunboy/joint-chiefs/releases/download/v0.5.11/Joint-Chiefs.dmg"
+                length="5996667"
+                type="application/octet-stream"
+                sparkle:edSignature="yIn9w7IK/TORYgR7g60hZlSph3qoLedAhGM2f80pv95xKMbdWzFxByBGwI/3x8G/grBMKbI2CFmMXFDjvYyDDQ=="/>
+        </item>
+
+        <item>
             <title>Version 0.5.10</title>
             <pubDate>Fri, 29 May 2026 00:35:00 +0000</pubDate>
             <sparkle:version>1777000008</sparkle:version>
