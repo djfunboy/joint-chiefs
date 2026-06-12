@@ -55,7 +55,7 @@ public struct StrategyConfig: Codable, Sendable, Equatable {
     // MARK: - Per-Provider Model Selection
 
     /// Override the default model string for a given provider (e.g. pick
-    /// `claude-sonnet-4-6` over `claude-opus-4-6`). Resolution priority in
+    /// `claude-sonnet-4-6` over `claude-fable-5`). Resolution priority in
     /// `ProviderFactory`: `providerModels[type]` > env var (`OPENAI_MODEL`,
     /// `ANTHROPIC_MODEL`, etc.) > `ProviderType.defaultModel`.
     ///

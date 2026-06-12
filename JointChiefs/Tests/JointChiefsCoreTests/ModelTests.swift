@@ -47,7 +47,7 @@ struct ModelTests {
     @Test("ProviderType has correct default models")
     func providerTypeDefaultModels() {
         #expect(ProviderType.openAI.defaultModel == "gpt-5.5")
-        #expect(ProviderType.anthropic.defaultModel == "claude-opus-4-8")
+        #expect(ProviderType.anthropic.defaultModel == "claude-fable-5")
         #expect(ProviderType.gemini.defaultModel == "gemini-3.5-flash")
         #expect(ProviderType.grok.defaultModel == "grok-4.3")
         #expect(ProviderType.ollama.defaultModel == "llama3")

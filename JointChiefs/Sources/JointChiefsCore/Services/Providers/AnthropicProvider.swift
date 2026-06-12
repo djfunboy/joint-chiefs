@@ -18,12 +18,12 @@ public struct AnthropicProvider: ReviewProvider {
     ///
     /// - Parameters:
     ///   - apiKey: The Anthropic API key used for authentication.
-    ///   - model: The model identifier to use. Defaults to `"claude-opus-4-6"`.
+    ///   - model: The model identifier to use. Defaults to `"claude-fable-5"`.
     ///   - endpoint: The base URL for the Anthropic API. Defaults to `https://api.anthropic.com`.
     ///   - urlSession: The URL session to use for requests. Defaults to `.shared`.
     public init(
         apiKey: String,
-        model: String = "claude-opus-4-6",
+        model: String = "claude-fable-5",
         endpoint: URL = URL(string: "https://api.anthropic.com")!,
         urlSession: URLSession = .shared
     ) {

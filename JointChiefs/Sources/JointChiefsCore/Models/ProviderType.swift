@@ -17,7 +17,7 @@ public enum ProviderType: String, Codable, CaseIterable, Sendable {
     public var defaultModel: String {
         switch self {
         case .openAI: "gpt-5.5"
-        case .anthropic: "claude-opus-4-8"
+        case .anthropic: "claude-fable-5"
         case .gemini: "gemini-3.5-flash"
         case .grok: "grok-4.3"
         case .ollama: "llama3"
@@ -33,6 +33,9 @@ public enum ProviderType: String, Codable, CaseIterable, Sendable {
     ///
     /// Keep lists short and opinionated. Stale entries are worse than missing
     /// entries for a setup-app UX.
+    ///
+    /// Snapshot verified against each provider's live models endpoint on
+    /// 2026-06-12 — every id below resolved via its get-model endpoint.
     public var availableModels: [String] {
         switch self {
         case .openAI:
@@ -41,13 +44,13 @@ public enum ProviderType: String, Codable, CaseIterable, Sendable {
                 "gpt-5.5-pro",    // pro-tier reasoning for hard problems
                 "gpt-5.4",        // prior flagship
                 "gpt-5.4-mini",   // fast + cheap
-                "gpt-5.3-codex"   // coding-specialized (no 5.5-codex variant yet)
+                "gpt-5.3-codex"   // coding-specialized (newest codex; no 5.4/5.5-codex as of 2026-06-12)
             ]
         case .anthropic:
             return [
-                "claude-opus-4-8",               // flagship (default — moderator)
-                "claude-opus-4-7",               // prior flagship
-                "claude-opus-4-6",               // older flagship
+                "claude-fable-5",                // flagship (default — moderator)
+                "claude-opus-4-8",               // prior flagship
+                "claude-opus-4-7",               // older flagship
                 "claude-sonnet-4-6",             // balanced
                 "claude-haiku-4-5-20251001"      // fast + cheap
             ]
@@ -55,13 +58,12 @@ public enum ProviderType: String, Codable, CaseIterable, Sendable {
             return [
                 "gemini-3.5-flash",            // latest agentic/coding default
                 "gemini-3.1-pro-preview",      // prior flagship
-                "gemini-3-pro-preview",        // prior 3.x flagship
                 "gemini-2.5-pro",              // prior-gen flagship
                 "gemini-3.1-flash-lite"        // fast / cheap (GA)
             ]
         case .grok:
             // xAI's currently-available chat models, verified against the live
-            // /v1/models endpoint on 2026-05-16. grok-4-* and grok-3 retired
+            // /v1/models endpoint on 2026-06-12. grok-4-* and grok-3 retired
             // 2026-05-15 and no longer resolve — do not re-add them.
             // grok-imagine-* are image/video models, not chat-capable.
             return [
