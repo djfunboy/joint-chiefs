@@ -29,7 +29,6 @@ Multi-model AI code review orchestrator. Four surfaces (CLI, stdio MCP server, m
 - **No Sentry or telemetry** — deliberately omitted to avoid privacy-policy/tracking disclosure obligations. Do not add any analytics.
 - **Keygetter is the sole credential accessor.** All `credentials.json` reads/writes go through `jointchiefs-keygetter` via `Process`. `LegacyKeychainStore` exists only for the one-time `keygetter migrate` path (v0.5.7 migration).
 - **Setup-guide / llms.txt sync.** The in-app AI prompt in `MCPConfigView.swift` (`aiPrompt`) tells the host AI to fetch `https://jointchiefs.ai/setup-guide.md`. Any change to binary paths, install commands, providers, tool names, rate limits, restart guidance, failure modes, or verification steps requires parallel updates to `setup-guide.md` AND `llms.txt` in the website repo. Treat the trio as one logical surface.
-- **Voice for long-form content.** Articles, blog posts, marketing copy — load `~/Library/CloudStorage/Dropbox/Build/Content/voice-of-chris-doyle.md` first.
 - **`@MainActor`** on all classes that publish UI state.
 
 ## Configuration
