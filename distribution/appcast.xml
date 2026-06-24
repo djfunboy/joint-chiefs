@@ -54,7 +54,7 @@
             <description><![CDATA[
                 <h2>What's new</h2>
                 <ul>
-                    <li>Updated AI models: <code>claude-fable-5</code> (Claude Fable 5) is the new moderator default.</li>
+                    <li>Updated provider model lists and moderator defaults.</li>
                     <li>Refreshed provider model lists — every shipped model id re-verified against live provider APIs.</li>
                 </ul>
             ]]></description>
