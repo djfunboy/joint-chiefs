@@ -35,7 +35,7 @@ public enum ProviderType: String, Codable, CaseIterable, Sendable {
     /// entries for a setup-app UX.
     ///
     /// Snapshot verified against each provider's live models endpoint on
-    /// 2026-06-12 — every id below resolved via its get-model endpoint.
+    /// 2026-06-30 — every id below resolved via its get-model endpoint.
     public var availableModels: [String] {
         switch self {
         case .openAI:
@@ -50,6 +50,7 @@ public enum ProviderType: String, Codable, CaseIterable, Sendable {
             return [
                 "claude-opus-4-8",               // flagship (default — moderator)
                 "claude-opus-4-7",               // prior flagship
+                "claude-sonnet-5",               // newest Sonnet (Claude 5 family)
                 "claude-sonnet-4-6",             // balanced
                 "claude-haiku-4-5-20251001"      // fast + cheap
             ]

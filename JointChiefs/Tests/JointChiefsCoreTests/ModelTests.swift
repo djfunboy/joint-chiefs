@@ -60,6 +60,11 @@ struct ModelTests {
         }
     }
 
+    @Test("Anthropic picker includes Claude Sonnet 5")
+    func anthropicListsSonnet5() {
+        #expect(ProviderType.anthropic.availableModels.contains("claude-sonnet-5"))
+    }
+
     // MARK: - ReviewContext
 
     @Test("ReviewContext round-trips with all fields")
