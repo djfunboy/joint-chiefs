@@ -46,6 +46,26 @@
         -->
 
         <item>
+            <title>Version 0.5.12</title>
+            <pubDate>Wed, 01 Jul 2026 23:30:00 +0000</pubDate>
+            <sparkle:version>1777000010</sparkle:version>
+            <sparkle:shortVersionString>0.5.12</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[
+                <h2>What's new</h2>
+                <ul>
+                    <li>Updated AI models: <code>claude-fable-5</code> (Claude Fable 5) is back as the moderator default after Anthropic re-released it.</li>
+                    <li><code>claude-sonnet-5</code> (Claude Sonnet 5) added to the curated Anthropic picker; every shipped model id re-verified against live provider APIs.</li>
+                </ul>
+            ]]></description>
+            <enclosure
+                url="https://github.com/djfunboy/joint-chiefs/releases/download/v0.5.12/Joint-Chiefs.dmg"
+                length="5996757"
+                type="application/octet-stream"
+                sparkle:edSignature="8QiWjrJ+LEPvvKPgGAc6PmpzImdDp5biFrLzpXG0u4WM/GiO08ilPev5zhaf+uPhzoik8rusSAj5RaXZZ7mCDg=="/>
+        </item>
+
+        <item>
             <title>Version 0.5.11</title>
             <pubDate>Fri, 12 Jun 2026 13:22:21 +0000</pubDate>
             <sparkle:version>1777000009</sparkle:version>
