@@ -10,7 +10,7 @@ struct AnthropicProviderTests {
     private func makeProvider(session: URLSession? = nil) -> AnthropicProvider {
         AnthropicProvider(
             apiKey: "test-key-123",
-            model: "claude-opus-4-8",
+            model: "claude-fable-5",
             endpoint: testEndpoint,
             urlSession: session ?? TestHelpers.makeTestURLSession()
         )

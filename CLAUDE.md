@@ -7,7 +7,7 @@
 Multi-model AI code review orchestrator. Four surfaces (CLI, stdio MCP server, macOS setup app, keygetter binary) built on one `JointChiefsCore` engine. Hub-and-spoke debate with Claude as moderator; streams consensus summary. Grounded in MAD research.
 
 **Website:** https://jointchiefs.ai/ (source: private `djfunboy/joint-chiefs-website` repo — this repo is the app)
-**Current main:** Anthropic/moderator default is `claude-opus-4-8` after the prior Anthropic default was discontinued. Latest release is v0.5.11. 93 tests. CFBundleVersion `1777000009`.
+**Current main:** Anthropic/moderator default is `claude-fable-5` (re-added 2026-07-01 after Anthropic restored it; also lists `claude-sonnet-5`). Latest release is v0.5.11. 90+ tests. CFBundleVersion `1777000009`.
 **Next session:** read the most recent `tasks/SESSION-HANDOFF-*.md` (gitignored; local-only).
 
 ## Stack & Architecture
@@ -39,7 +39,7 @@ API keys via `APIKeyResolver`:
 
 Optional model overrides: `OPENAI_MODEL`, `GEMINI_MODEL`, `GROK_MODEL`, `ANTHROPIC_MODEL`, `CONSENSUS_MODEL`
 Local: `OLLAMA_ENABLED=1`, `OLLAMA_MODEL` (default `llama3`); `OPENAI_COMPATIBLE_BASE_URL` + `OPENAI_COMPATIBLE_MODEL`
-**Defaults:** `gpt-5.5`, `gemini-3.5-flash`, `grok-4.3`, `claude-opus-4-8` · 5 rounds, 120s timeout, adaptive early break
+**Defaults:** `gpt-5.5`, `gemini-3.5-flash`, `grok-4.3`, `claude-fable-5` · 5 rounds, 120s timeout, adaptive early break
 Dev keys: `tasks/api-keys.local.md` (gitignored) + `~/.zshrc` exports
 
 ## Repository Separation
