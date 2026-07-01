@@ -17,7 +17,7 @@ public enum ProviderType: String, Codable, CaseIterable, Sendable {
     public var defaultModel: String {
         switch self {
         case .openAI: "gpt-5.5"
-        case .anthropic: "claude-opus-4-8"
+        case .anthropic: "claude-fable-5"
         case .gemini: "gemini-3.5-flash"
         case .grok: "grok-4.3"
         case .ollama: "llama3"
@@ -25,7 +25,7 @@ public enum ProviderType: String, Codable, CaseIterable, Sendable {
         }
     }
 
-    /// Top 5 curated models per provider — flagship, fast, older flagship,
+    /// Curated models per provider — flagship, fast, older flagship,
     /// multimodal/specialized, and a budget option where applicable. First
     /// entry always matches `defaultModel` so the picker opens with the
     /// shipped default selected. Users who need a model outside this list
@@ -35,7 +35,7 @@ public enum ProviderType: String, Codable, CaseIterable, Sendable {
     /// entries for a setup-app UX.
     ///
     /// Snapshot verified against each provider's live models endpoint on
-    /// 2026-06-30 — every id below resolved via its get-model endpoint.
+    /// 2026-07-01 — every id below resolved via its get-model endpoint.
     public var availableModels: [String] {
         switch self {
         case .openAI:
@@ -48,8 +48,9 @@ public enum ProviderType: String, Codable, CaseIterable, Sendable {
             ]
         case .anthropic:
             return [
-                "claude-opus-4-8",               // flagship (default — moderator)
-                "claude-opus-4-7",               // prior flagship
+                "claude-fable-5",                // flagship (default — moderator)
+                "claude-opus-4-8",               // prior flagship
+                "claude-opus-4-7",               // older flagship
                 "claude-sonnet-5",               // newest Sonnet (Claude 5 family)
                 "claude-sonnet-4-6",             // balanced
                 "claude-haiku-4-5-20251001"      // fast + cheap

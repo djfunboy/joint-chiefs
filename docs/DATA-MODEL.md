@@ -261,7 +261,7 @@ public enum ProviderType: String, Codable, CaseIterable, Sendable {
     public var defaultModel: String {
         switch self {
         case .openAI: "gpt-5.5"
-        case .anthropic: "claude-opus-4-8"
+        case .anthropic: "claude-fable-5"
         case .gemini: "gemini-3.5-flash"
         case .grok: "grok-4.3"           // ← now active
         case .ollama: "llama3"
