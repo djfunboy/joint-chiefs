@@ -7,7 +7,7 @@
 Multi-model AI code review orchestrator. Four surfaces (CLI, stdio MCP server, macOS setup app, keygetter binary) built on one `JointChiefsCore` engine. Hub-and-spoke debate with Claude as moderator; streams consensus summary. Grounded in MAD research.
 
 **Website:** https://jointchiefs.ai/ (source: private `djfunboy/joint-chiefs-website` repo — this repo is the app)
-**Latest release:** v0.5.12 — `claude-fable-5` restored as Anthropic/moderator default (Anthropic re-released it); `claude-sonnet-5` added to the picker. 90+ tests. CFBundleVersion `1777000010`.
+**Latest release:** v0.5.13 — added `claude-opus-5` (newest Opus flagship) to the Anthropic picker; `claude-fable-5` remains the Anthropic/moderator default. 90+ tests. CFBundleVersion `1777000011`.
 **Next session:** read the most recent `tasks/SESSION-HANDOFF-*.md` (gitignored; local-only).
 
 ## Stack & Architecture

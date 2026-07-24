@@ -46,6 +46,26 @@
         -->
 
         <item>
+            <title>Version 0.5.13</title>
+            <pubDate>Fri, 24 Jul 2026 19:01:29 +0000</pubDate>
+            <sparkle:version>1777000011</sparkle:version>
+            <sparkle:shortVersionString>0.5.13</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[
+                <h2>What's new</h2>
+                <ul>
+                    <li>Updated AI models: added <code>claude-opus-5</code> (Claude Opus 5), the newest Opus-tier flagship, to the curated Anthropic picker.</li>
+                    <li><code>claude-fable-5</code> (Claude Fable 5) remains the moderator default; every shipped model id re-verified against live provider APIs.</li>
+                </ul>
+            ]]></description>
+            <enclosure
+                url="https://github.com/djfunboy/joint-chiefs/releases/download/v0.5.13/Joint-Chiefs.dmg"
+                length="6058916"
+                type="application/octet-stream"
+                sparkle:edSignature="0T/IplwTxR3Sp+5ZkNyDmBMVc3owsPROsJTrDkIz4Ct1KjP7QFAfyhEVCsTdVKUeab/TFZVeXiD/s0aiRFQFBg=="/>
+        </item>
+
+        <item>
             <title>Version 0.5.12</title>
             <pubDate>Wed, 01 Jul 2026 23:30:00 +0000</pubDate>
             <sparkle:version>1777000010</sparkle:version>

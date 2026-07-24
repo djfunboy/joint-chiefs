@@ -12,7 +12,7 @@
 
 cask "joint-chiefs" do
   version "0.5.13"
-  sha256 "862af844ac4923563f7c7b957a937bbdf8dd51f68caef44ef9309df2b56d2725"
+  sha256 "4f8800bb869bbe42755dbaf41ea555ecf4452d996fb9e6245d7b845ab0be7bb6"
 
   url "https://github.com/djfunboy/joint-chiefs/releases/download/v#{version}/Joint-Chiefs.dmg",
       verified: "github.com/djfunboy/joint-chiefs/"
