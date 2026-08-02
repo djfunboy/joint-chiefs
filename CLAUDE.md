@@ -65,4 +65,4 @@ Before any release action (tag, DMG build, `gh release`, appcast, cask bump, or 
 
 ## Project Docs
 
-`docs/ARCHITECTURE.md` · `docs/VALUE-PROPOSITION.md` · `docs/BUILD-PLAN.md` · `docs/PRD.md` · `docs/DATA-MODEL.md` · `docs/DESIGN-SYSTEM.md` · `docs/KNOWN-ISSUES.md` · `tasks/lessons.md`
+`docs/ARCHITECTURE.md` · `docs/VALUE-PROPOSITION.md` · `docs/BUILD-PLAN.md` · `docs/PRD.md` · `docs/DATA-MODEL.md` · `docs/DESIGN-SYSTEM.md` · `docs/KNOWN-ISSUES.md` · `docs/BUG-REPORTS.md` · `tasks/lessons.md`
