@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-05-27
 
-A running list of known bugs, limitations, and rough edges. PRs that fix any of these are welcome.
+Theoretical watchlist: nagging items, tech debt, design follow-ups, QA gaps, and monitoring areas. Concrete bugs and their resolutions live in [BUG-REPORTS.md](./BUG-REPORTS.md).
 
 ## Design System Follow-ups (Setup App)
 
@@ -10,10 +10,6 @@ All six setup-app view files (`RootView`, `UsageView`, `KeysView`, `RolesWeights
 
 - **Ollama / OpenAI-compatible enable toggles** use the system default `Toggle` chrome. Agentdeck doesn't yet spec a custom toggle style; revisit if the native look feels out of place against the warm surfaces.
 - **Picker (Tiebreaker)** uses the native `.menu` picker; consensus/moderator moved to `AgentChip`. The menu picker still shows the macOS accent tint — acceptable for a dropdown, but worth revisiting if it reads as inconsistent.
-
-## Active Bugs
-
-- **No pre-flight validation when picking a moderator without a saved API key.** `RolesWeightsView` lets the user select any provider as moderator regardless of whether that provider's key is saved. Save accepts it and the review blows up at runtime. Fix: inline error in `RolesWeightsView.moderatorSection` when `model.keyStatuses[selection]` is `.unconfigured`/`.none`/`.failed`, or disable Save until resolved. Originally flagged in the 04-23 UX review; verified still open against `RolesWeightsView.swift` on 2026-04-26.
 
 ## Known Limitations
 
