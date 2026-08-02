@@ -3,7 +3,7 @@
 **Version:** 1.3
 **Last Updated:** 2026-05-27
 **Source of truth:** [Agentdeck design system](https://ui-engine-gallery.netlify.app/agentdeck/design-system)
-**Companion:** [`../../Joint Chiefs Website/docs/DESIGN-SYSTEM.md`](../../Joint%20Chiefs%20Website/docs/DESIGN-SYSTEM.md) — same tokens, CSS implementation
+**Companion:** [Joint Chiefs Website design system](https://github.com/djfunboy/joint-chiefs-website/blob/main/docs/reference/DESIGN-SYSTEM.md) — same tokens, CSS implementation
 
 This document defines the visual language for the Joint Chiefs macOS app (setup app, and any future UI surfaces) and codifies how Agentdeck's design system maps to SwiftUI primitives.
 
@@ -361,11 +361,11 @@ Map the Agentdeck components onto existing setup app views:
 
 ## Companion docs
 
-- `ARCHITECTURE.md` — system design (references design system for any new surface)
-- `PRD.md` — product requirements (F6 setup app refers here for visual specs)
-- `DATA-MODEL.md` — type definitions
-- `KNOWN-ISSUES.md` — active issues
-- `../../Joint Chiefs Website/docs/DESIGN-SYSTEM.md` — CSS-side of the same tokens
+- [`ARCHITECTURE.md`](../as-built/ARCHITECTURE.md) — system design (references design system for any new surface)
+- [`PRD.md`](../intent/PRD.md) — product requirements (F6 setup app refers here for visual specs)
+- [`DATA-MODEL.md`](../as-built/DATA-MODEL.md) — type definitions
+- [`KNOWN-ISSUES.md`](../as-built/KNOWN-ISSUES.md) — active issues
+- [Joint Chiefs Website design system](https://github.com/djfunboy/joint-chiefs-website/blob/main/docs/reference/DESIGN-SYSTEM.md) — CSS-side of the same tokens
 
 ## Revision History
 

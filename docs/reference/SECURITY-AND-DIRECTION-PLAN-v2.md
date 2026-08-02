@@ -3,7 +3,7 @@
 **Status:** Draft for second Joint Chiefs review
 **Date:** 2026-04-16
 **Domain (owned):** jointchiefs.ai
-**Supersedes:** `SECURITY-AND-DIRECTION-PLAN.md` (v1, same date)
+**Supersedes:** [`SECURITY-AND-DIRECTION-PLAN.md`](./SECURITY-AND-DIRECTION-PLAN.md) (v1, same date)
 
 This revision incorporates the panel's findings from the v1 review (transcript: `tasks/jc-review-result.md`). Every critical, high, and medium finding is addressed below with attribution. Two architectural decisions from v1 were reversed based on the panel's analysis:
 

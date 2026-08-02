@@ -1,8 +1,5 @@
 # Joint Chiefs — Data Model
 
-**Version:** 1.3
-**Last Updated:** 2026-05-27
-
 ## Live Configuration Types
 
 These types are the ones actually in the shipping codebase. The SwiftData schema
@@ -436,12 +433,3 @@ KeychainService.delete(for: config.keychainID)
 Keychain items use:
 - Service: `"com.jointchiefs.provider"`
 - Account: `keychainID` from the `ProviderConfig`
-
-## Revision History
-
-| Version | Date | Changes |
-|---|---|---|
-| 1.0 | 2026-04-08 | Initial data model |
-| 1.1 | 2026-04-19 | Added "Live Configuration Types" section describing `StrategyConfig` (including `providerWeights`) and `ProviderType` as they actually exist in the shipping codebase. Marked the SwiftData section as deferred-menu-bar-app reference material. |
-| 1.2 | 2026-04-26 | Reconciled `StrategyConfig` with shipping fields the v1.1 doc was missing: `providerModels` (per-provider model override; v0.3.0), `ollama: OllamaConfig` (first-class config; v0.3.0+), `openAICompatible: OpenAICompatibleConfig` (LM Studio / Jan / llama.cpp-server / Msty / LocalAI; v0.4.0). Added the `.openAICompatible` case to the live `ProviderType` enum and documented `availableModels` (curated top-5 picker source). Added new sections describing `providerModels`, `ollama`, and `openAICompatible` semantics + on-disk JSON shape. |
-| 1.3 | 2026-05-27 | Marked the Keychain section as legacy/deferred so it cannot be mistaken for the shipping v0.5.7+ credential-file path. |

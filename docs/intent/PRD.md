@@ -172,7 +172,7 @@ Local transcript files written to disk. A UI for browsing them is deferred with 
 3. **Opinionated defaults, full control.** Works great out of the box. Every parameter is configurable.
 4. **Graceful degradation.** If 1 of 3 models fails, the review continues with 2. Never block on a single provider.
 5. **Privacy first.** Stdio-only MCP, local credential file, no telemetry. Only configured provider API calls leave the machine.
-6. **Research-backed debate.** The structured debate mechanism is grounded in Multi-Agent Debate (MAD) research (Liang et al., 2023; [arXiv:2305.19118](https://arxiv.org/abs/2305.19118)), which demonstrates that adversarial collaboration between multiple LLMs produces more accurate and reliable outputs than single-model inference or self-reflection. See `docs/RESEARCH.md` for implementation details.
+6. **Research-backed debate.** The structured debate mechanism is grounded in Multi-Agent Debate (MAD) research (Liang et al., 2023; [arXiv:2305.19118](https://arxiv.org/abs/2305.19118)), which demonstrates that adversarial collaboration between multiple LLMs produces more accurate and reliable outputs than single-model inference or self-reflection. See [`RESEARCH.md`](../reference/RESEARCH.md) for implementation details.
 
 ## Success Metrics
 

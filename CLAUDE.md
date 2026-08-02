@@ -17,7 +17,7 @@ Multi-model AI code review orchestrator. Four surfaces (CLI, stdio MCP server, m
 - **MCP dependency:** `modelcontextprotocol/swift-sdk` pinned **exact 0.12.0**
 - **State management:** `@Observable` macro + `@State`/`@Environment`/`@Bindable`. Never mix with `ObservableObject`.
 - **Service pattern:** `@Environment` injection — no singletons.
-- **Design system:** Agentdeck (monospace-as-identity, warm-charcoal). All colors/fonts/spacing/radii in `JointChiefsSetup` MUST come from `Agentdeck*` token files in `Sources/JointChiefsSetup/DesignSystem/`. Read `docs/DESIGN-SYSTEM.md` before any UI change. Never hardcode hex or CGFloat.
+- **Design system:** Agentdeck (monospace-as-identity, warm-charcoal). All colors/fonts/spacing/radii in `JointChiefsSetup` MUST come from `Agentdeck*` token files in `Sources/JointChiefsSetup/DesignSystem/`. Read `docs/reference/DESIGN-SYSTEM.md` before any UI change. Never hardcode hex or CGFloat.
 - **Providers:** OpenAI, Anthropic Claude, Google Gemini, xAI Grok, Ollama, OpenAI-compatible (LM Studio/Jan/llama.cpp-server/Msty/LocalAI) — all via REST + SSE streaming
 - **Storage:** `StrategyConfig` JSON → `~/Library/Application Support/Joint Chiefs/strategy.json` (0600); API keys → `credentials.json` (same dir, 0600) via keygetter only
 
@@ -61,8 +61,8 @@ Before any release action (tag, DMG build, `gh release`, appcast, cask bump, or 
 2. **Diff scan** — grep every new commit since last tag for: `sk-[A-Za-z0-9]{20,}`, `ghp_`, `gho_`, `xoxb-`, `BEGIN [A-Z ]*PRIVATE KEY`, `Authorization: Bearer`, `aws_secret`, `password\s*=`, real API key prefixes.
 3. **Code review** — pre-commit + code-review checklists from `~/.claude/rules/checklists.md`. Zero warnings, all tests pass.
 4. **Cold-machine smoke test** — `rm -rf "/Applications/Joint Chiefs.app"`, mount fresh DMG, drag-install, launch, confirm first-run window appears. Signing/notarization verdicts alone don't catch dyld/rpath failures.
-5. **Doc scan** — CLAUDE.md current-state line, `docs/BUILD-PLAN.md`, `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/KNOWN-ISSUES.md`, `README.md` reflect shipping state. Version bumped in source. No stale internal refs.
+5. **Doc scan** — CLAUDE.md current-state line, `docs/intent/ROADMAP.md`, `tasks/STATUS.md`, `docs/intent/PRD.md`, `docs/as-built/ARCHITECTURE.md`, `docs/as-built/KNOWN-ISSUES.md`, and `README.md` reflect shipping state. Version bumped in source. No stale internal refs.
 
 ## Project Docs
 
-`docs/ARCHITECTURE.md` · `docs/VALUE-PROPOSITION.md` · `docs/BUILD-PLAN.md` · `docs/PRD.md` · `docs/DATA-MODEL.md` · `docs/DESIGN-SYSTEM.md` · `docs/KNOWN-ISSUES.md` · `docs/BUG-REPORTS.md` · `tasks/lessons.md`
+`docs/README.md` · `docs/intent/{PRD,VALUE-PROPOSITION,ROADMAP}.md` · `docs/intent/decisions/` · `docs/as-built/{ARCHITECTURE,DATA-MODEL,KNOWN-ISSUES,BUG-REPORTS}.md` · `docs/reference/` · `tasks/{STATUS,lessons}.md`
