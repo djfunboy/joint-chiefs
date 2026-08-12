@@ -2,6 +2,24 @@ import Foundation
 import JointChiefsCore
 import Observation
 
+// MARK: - Errors
+
+/// Refusals raised while persisting the strategy. Kept separate from
+/// `StrategyConfigStore`'s I/O errors — these are configuration problems the
+/// user can fix on screen, not write failures.
+enum StrategySaveError: LocalizedError {
+    /// A debate role points at a provider with no usable API key, so the saved
+    /// config would fail at the first review.
+    case roleKeyMissing([RoleKeyIssue])
+
+    var errorDescription: String? {
+        switch self {
+        case .roleKeyMissing(let issues):
+            issues.map(\.message).joined(separator: " ")
+        }
+    }
+}
+
 /// Root state for the setup app. Loads any previously saved `StrategyConfig` from
 /// disk and exposes draft mutations that are committed either immediately (API
 /// keys go straight to the keygetter) or on explicit save (strategy changes).
@@ -94,6 +112,12 @@ final class SetupModel {
     /// probe plus per-provider Test actions.
     var keyStatuses: [ProviderType: KeyStatus] = [:]
 
+    /// False until `refreshKeyStatuses()` has completed once. Every provider is
+    /// seeded to `.unconfigured` at init, so role pre-flight has to stay silent
+    /// until this flips — otherwise a correctly configured install would flash
+    /// "no key for your moderator" on first paint.
+    private(set) var keyStatusesProbed = false
+
     // MARK: - CLI install
 
     enum CLIInstallStatus: Equatable {
@@ -148,6 +172,31 @@ final class SetupModel {
                 keyStatuses[type] = .unconfigured
             }
         }
+        keyStatusesProbed = true
+    }
+
+    // MARK: - Role key pre-flight
+
+    /// Providers whose key is saved and not known-bad. `.testing` counts —
+    /// a key is only in that state because it was already written.
+    var providersWithUsableKey: Set<ProviderType> {
+        var usable: Set<ProviderType> = []
+        for (provider, status) in keyStatuses {
+            switch status {
+            case .saved, .testing, .ok:
+                usable.insert(provider)
+            case .unconfigured, .failed:
+                continue
+            }
+        }
+        return usable
+    }
+
+    /// Moderator/tiebreaker roles assigned to a provider with no usable key.
+    /// Empty until the credential probe has run — see `keyStatusesProbed`.
+    var roleKeyIssues: [RoleKeyIssue] {
+        guard keyStatusesProbed else { return [] }
+        return strategy.roleKeyIssues(configuredProviders: providersWithUsableKey)
     }
 
     // MARK: - Strategy mutations
@@ -392,6 +441,10 @@ final class SetupModel {
     }
 
     func saveStrategy() throws {
+        // The Save button is already disabled while issues exist; this guard is
+        // what makes it an invariant rather than a UI convention.
+        let issues = roleKeyIssues
+        guard issues.isEmpty else { throw StrategySaveError.roleKeyMissing(issues) }
         try StrategyConfigStore.save(strategy)
         strategyIsDirty = false
     }
@@ -577,7 +630,7 @@ final class SetupModel {
 
     private static func defaultInstallDirectory() -> URL {
         // Apple Silicon Homebrew prefix first — matches where the existing CLI
-        // install lives (see BUILD-PLAN Phase 5).
+        // install lives (see docs/intent/ROADMAP.md, Phase 5).
         let homebrew = URL(fileURLWithPath: "/opt/homebrew/bin")
         if FileManager.default.isWritableFile(atPath: homebrew.path) {
             return homebrew

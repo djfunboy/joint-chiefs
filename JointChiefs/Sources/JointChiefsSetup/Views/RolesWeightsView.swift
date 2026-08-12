@@ -30,7 +30,7 @@ struct RolesWeightsView: View {
             }
             .buttonStyle(.agentSecondary)
             .keyboardShortcut("s", modifiers: .command)
-            .disabled(!model.strategyIsDirty)
+            .disabled(!model.strategyIsDirty || !model.roleKeyIssues.isEmpty)
 
             Button("Next: MCP Config") {
                 model.currentSection = .mcp
@@ -64,12 +64,14 @@ struct RolesWeightsView: View {
             HStack(spacing: AgentSpacing.xs) {
                 ForEach(ModeratorSelection.allCases, id: \.self) { selection in
                     AgentChip(
-                        label: label(for: selection),
+                        label: selection.displayName,
                         isActive: model.strategy.moderator == selection,
                         action: { model.setModerator(selection) }
                     )
                 }
             }
+
+            issueNotice(for: .moderator)
         }
         .agentPanel()
     }
@@ -100,12 +102,14 @@ struct RolesWeightsView: View {
                 )
                 ForEach(ModeratorSelection.allCases, id: \.self) { selection in
                     AgentChip(
-                        label: label(for: selection),
+                        label: selection.displayName,
                         isActive: isTiebreakerActive(.specific(selection)),
                         action: { model.setTiebreaker(.specific(selection)) }
                     )
                 }
             }
+
+            issueNotice(for: .tiebreaker)
         }
         .agentPanel()
     }
@@ -259,15 +263,23 @@ struct RolesWeightsView: View {
         .agentPanel()
     }
 
-    // MARK: - Labels
+    // MARK: - Role Key Preflight
 
-    private func label(for selection: ModeratorSelection) -> String {
-        switch selection {
-        case .claude: "Claude"
-        case .openai: "OpenAI"
-        case .gemini: "Gemini"
-        case .grok: "Grok"
-        case .none: "None (code)"
+    /// Inline error when the role is assigned to a provider with no usable key.
+    /// Nothing renders until the credential probe has run, so a correctly
+    /// configured install never flashes a warning during first paint.
+    @ViewBuilder
+    private func issueNotice(for role: RoleKeyIssue.Role) -> some View {
+        if let issue = model.roleKeyIssues.first(where: { $0.role == role }) {
+            VStack(alignment: .leading, spacing: AgentSpacing.xs) {
+                AgentPill(text: issue.summary, kind: .error, icon: "exclamationmark.triangle.fill")
+                Text(issue.guidance)
+                    .font(.agentXS)
+                    .foregroundStyle(Color.agentTextMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(role.displayName) error: \(issue.message)")
         }
     }
 }

@@ -362,6 +362,17 @@ public enum ModeratorSelection: String, Codable, Sendable, CaseIterable {
         case .none: nil
         }
     }
+
+    /// Human-readable name for UI and diagnostics.
+    public var displayName: String {
+        switch self {
+        case .claude: "Claude"
+        case .openai: "OpenAI"
+        case .gemini: "Gemini"
+        case .grok: "Grok"
+        case .none: "None (code)"
+        }
+    }
 }
 
 // MARK: - TiebreakerSelection
@@ -369,6 +380,84 @@ public enum ModeratorSelection: String, Codable, Sendable, CaseIterable {
 public enum TiebreakerSelection: Codable, Sendable, Equatable {
     case sameAsModerator
     case specific(ModeratorSelection)
+}
+
+// MARK: - Role Key Preflight
+
+/// A debate role pointed at a provider that has no usable API key. Picking a
+/// moderator or tiebreaker is independent of key entry, so a config can look
+/// valid in the setup app and then fail at the first review — this is how that
+/// mismatch is surfaced before the config is saved.
+public struct RoleKeyIssue: Equatable, Sendable {
+
+    public enum Role: String, Sendable, Equatable {
+        case moderator
+        case tiebreaker
+
+        public var displayName: String {
+            switch self {
+            case .moderator: "Moderator"
+            case .tiebreaker: "Tiebreaker"
+            }
+        }
+    }
+
+    public let role: Role
+    public let selection: ModeratorSelection
+    public let providerType: ProviderType
+
+    public init(role: Role, selection: ModeratorSelection, providerType: ProviderType) {
+        self.role = role
+        self.selection = selection
+        self.providerType = providerType
+    }
+
+    /// One-line headline. Short enough for a single-line pill.
+    public var summary: String {
+        "\(role.displayName) — no API key for \(selection.displayName)"
+    }
+
+    /// What the user should do about it. Wraps; never truncate this.
+    public var guidance: String {
+        "Add a key for \(selection.displayName) on the API Keys screen, or pick a different \(role.rawValue)."
+    }
+
+    /// Headline plus guidance, for contexts that carry a single string (thrown
+    /// errors, logs).
+    public var message: String {
+        "\(summary). \(guidance)"
+    }
+}
+
+extension StrategyConfig {
+
+    /// Roles assigned to a provider the caller has no usable key for.
+    ///
+    /// - Parameter configuredProviders: Providers with a key that is saved and
+    ///   not known-bad. The caller owns that definition — the setup app derives
+    ///   it from its per-provider key probe.
+    /// - Returns: Moderator issue first, then tiebreaker; empty when every
+    ///   assigned role can actually run. A tiebreaker of `.sameAsModerator`
+    ///   never produces its own issue — the moderator entry already covers it.
+    public func roleKeyIssues(configuredProviders: Set<ProviderType>) -> [RoleKeyIssue] {
+        var issues: [RoleKeyIssue] = []
+
+        if let provider = moderator.providerType, !configuredProviders.contains(provider) {
+            issues.append(
+                RoleKeyIssue(role: .moderator, selection: moderator, providerType: provider)
+            )
+        }
+
+        if case .specific(let selection) = tiebreaker,
+           let provider = selection.providerType,
+           !configuredProviders.contains(provider) {
+            issues.append(
+                RoleKeyIssue(role: .tiebreaker, selection: selection, providerType: provider)
+            )
+        }
+
+        return issues
+    }
 }
 
 // MARK: - ConsensusMode

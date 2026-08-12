@@ -23,7 +23,7 @@ current appcast, CLAUDE.md, and shipping source during the docs migration.
 | 3 — Debate orchestrator | Complete |
 | 4 — Local HTTP server | Deferred; stdio MCP and direct CLI invocation are the accepted architecture |
 | 5 — CLI | Complete |
-| 6 — Setup app | Complete baseline; accessibility, moderator-key preflight, and migration smoke testing remain |
+| 6 — Setup app | Complete baseline; accessibility and migration smoke testing remain (moderator-key preflight landed 2026-08-02, unreleased) |
 | 7 — Transcript viewer | Deferred |
 | 8 — MCP server | Complete |
 | 9 — Polish and testing | Partial |
@@ -31,7 +31,7 @@ current appcast, CLAUDE.md, and shipping source during the docs migration.
 
 ## Active verification and product gaps
 
-- Open bug: moderator selection is not preflighted against saved credential state. See [`BUG-REPORTS.md`](../docs/as-built/BUG-REPORTS.md).
+- Moderator/tiebreaker key pre-flight landed 2026-08-02 (unreleased) — the bug ledger has no open entries. See [`BUG-REPORTS.md`](../docs/as-built/BUG-REPORTS.md).
 - Complete VoiceOver and Dynamic Type smoke testing across the five setup sections.
 - Profile idle memory and end-to-end review latency.
 - Run the real legacy-Keychain migration and headless credential-read test matrix.
