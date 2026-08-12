@@ -37,3 +37,17 @@ current appcast, CLAUDE.md, and shipping source during the docs migration.
 - Run the real legacy-Keychain migration and headless credential-read test matrix.
 - Validate six-provider adaptive convergence and moderator quality on large diffs.
 - Automatic related-file, git-diff, and project-doc context remains unimplemented.
+
+## Non-urgent follow-ups
+
+Carried forward from the April session notes when those were retired.
+
+- **Homebrew tap** — `djfunboy/homebrew-jointchiefs` does not exist yet, so the cask
+  still lives at `Casks/joint-chiefs.rb` in this repo. Creating the tap and copying the
+  cask in is what unlocks `brew install --cask joint-chiefs`.
+- **Netlify site ID in the public repo** — it appears in `docs/as-built/ARCHITECTURE.md`.
+  Not a credential, low priority, but this repo is public.
+- **Automate the Dropbox xattr workaround in `scripts/build-app.sh`** — Dropbox attaches
+  `com.apple.FinderInfo` to bundles and breaks codesign; staging to `/tmp` before signing
+  is currently manual. FiftyX's `scripts/release.sh` already does this automatically and
+  is the pattern to copy.
