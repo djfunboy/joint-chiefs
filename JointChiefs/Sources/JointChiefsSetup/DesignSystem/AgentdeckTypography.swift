@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Agentdeck Design System — Typography
 //
-// Source of truth: docs/DESIGN-SYSTEM.md
+// Source of truth: docs/reference/DESIGN-SYSTEM.md
 //
 // The app is "monospace as identity." Every button, pill, tab, code, and
 // technical label uses the system monospaced font. Proportional sans (the

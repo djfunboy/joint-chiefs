@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Agentdeck Design System — Color Tokens
 //
-// Source of truth: docs/DESIGN-SYSTEM.md
+// Source of truth: docs/reference/DESIGN-SYSTEM.md
 // Original reference: https://ui-engine-gallery.netlify.app/agentdeck/design-system
 //
 // Every color the app uses lives here. Views read these via `.agentBgDeep`,

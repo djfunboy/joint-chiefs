@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Agentdeck Design System — Reusable Components
 //
-// Source of truth: docs/DESIGN-SYSTEM.md
+// Source of truth: docs/reference/DESIGN-SYSTEM.md
 //
 // Components here are the Swift implementations of patterns the design system
 // already spec'd: the warm-tan dashed input focus, the tinted status pills,

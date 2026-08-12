@@ -146,7 +146,7 @@ You pick which providers participate. The moderator is configurable too (default
 
 Up to 5 debate rounds with adaptive early break when positions converge. Findings are anonymized before the final synthesis to reduce bias toward any single provider. Four consensus modes (`moderatorDecides`, `strictMajority`, `bestOfAll`, `votingThreshold`) with per-provider weighting.
 
-Full details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+Full details: [`docs/as-built/ARCHITECTURE.md`](docs/as-built/ARCHITECTURE.md).
 
 ## Configuration
 

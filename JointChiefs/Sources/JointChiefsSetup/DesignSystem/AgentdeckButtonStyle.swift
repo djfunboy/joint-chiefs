@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Agentdeck Button Styles
 //
-// Source of truth: docs/DESIGN-SYSTEM.md
+// Source of truth: docs/reference/DESIGN-SYSTEM.md
 //
 // Every button in the setup app uses one of these styles. Never style a
 // Button inline with `.background(...)` + `.foregroundStyle(...)` — always
